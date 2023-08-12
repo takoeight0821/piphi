@@ -1,48 +1,39 @@
-use std::rc::Rc;
+mod parser;
+mod syntax;
+use anyhow::Result;
 
-#[derive(Debug)]
-pub struct Expr {
-    kind: ExprKind,
-}
+fn main() -> Result<()> {
+    use syntax::*;
 
-impl Expr {
-    pub fn variable(name: &str) -> Expr {
-        Expr {
-            kind: ExprKind::Variable(Ident {
-                name: name.to_string(),
-            }),
-        }
+    let fun = syntax::Expr::codata(vec![
+        Clause::new(
+            &Pat::sequence(vec![
+                Pat::label("get"),
+                Pat::sequence(vec![Pat::this(), Pat::variable("x")]),
+            ]),
+            &Expr::variable("x"),
+        ),
+        Clause::new(
+            &Pat::sequence(vec![
+                Pat::label("set"),
+                Pat::sequence(vec![Pat::this(), Pat::variable("_")]),
+                Pat::variable("y"),
+            ]),
+            &Expr::apply(&Expr::variable("fun"), &Expr::variable("y")),
+        ),
+    ]);
+    let right = Expr::apply(&fun, &Expr::number(1));
+    let left = Expr::variable("get");
+    let expr = Expr::apply(&left, &right);
+
+    println!("{}", expr);
+
+    let src = format!("{}", expr);
+
+    let tokens = parser::tokenize(&src)?;
+    for token in &tokens {
+        println!("{}", token);
     }
 
-    pub fn number(n: i64) -> Expr {
-        Expr {
-            kind: ExprKind::Number(n),
-        }
-    }
-
-    pub fn add(left: &Rc<Expr>, right: &Rc<Expr>) -> Expr {
-        Expr {
-            kind: ExprKind::Add(left.clone(), right.clone()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ExprKind {
-    Variable(Ident),
-    Number(i64),
-    Add(Rc<Expr>, Rc<Expr>),
-}
-
-#[derive(Debug)]
-pub struct Ident {
-    name: String,
-}
-
-fn main() {
-    let left = Rc::new(Expr::number(1));
-    let right = Rc::new(Expr::variable("x"));
-    let expr = Expr::add(&left, &right);
-
-    println!("{:?}", expr);
+    Ok(())
 }
