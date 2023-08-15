@@ -7,12 +7,24 @@ use std::{
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Position {
+    pub offset: usize,
+    pub line: usize,
+    pub column: usize,
+}
+
 // TODO: add span
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
-    pub line: usize,
-    pub column: usize,
+    pub range: Range,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,43 +37,38 @@ pub enum TokenKind {
 }
 
 impl Token {
-    pub fn space(line: usize, column: usize) -> Token {
+    pub fn space(range: Range) -> Token {
         Token {
             kind: TokenKind::Space,
-            line,
-            column,
+            range,
         }
     }
 
-    pub fn newline(line: usize, column: usize) -> Token {
+    pub fn newline(range: Range) -> Token {
         Token {
             kind: TokenKind::Newline,
-            line,
-            column,
+            range,
         }
     }
 
-    pub fn ident(name: &str, line: usize, column: usize) -> Token {
+    pub fn ident(name: &str, range: Range) -> Token {
         Token {
             kind: TokenKind::Ident(name.to_string()),
-            line,
-            column,
+            range,
         }
     }
 
-    pub fn number(n: i64, line: usize, column: usize) -> Token {
+    pub fn number(n: i64, range: Range) -> Token {
         Token {
             kind: TokenKind::Number(n),
-            line,
-            column,
+            range,
         }
     }
 
-    pub fn symbol(name: &str, line: usize, column: usize) -> Token {
+    pub fn symbol(name: &str, range: Range) -> Token {
         Token {
             kind: TokenKind::Symbol(name.to_string()),
-            line,
-            column,
+            range,
         }
     }
 }
@@ -97,12 +104,12 @@ impl<'a> Lexer<'a> {
 
     fn consume(&mut self) -> Result<char> {
         let c = self.input.next().context("unexpected EOF")?;
-        self.pos += 1;
+        self.pos += c.len_utf8();
         if c == '\n' {
             self.line += 1;
             self.column = 0;
         } else {
-            self.column += 1;
+            self.column += c.len_utf8();
         }
         Ok(c)
     }
@@ -111,18 +118,33 @@ impl<'a> Lexer<'a> {
         self.input.clone().nth(i)
     }
 
+    fn current_position(&self) -> Position {
+        Position {
+            offset: self.pos,
+            line: self.line,
+            column: self.column,
+        }
+    }
+
     fn lex(&mut self) -> Result<Token> {
-        let line = self.line;
-        let column = self.column;
+        let start = self.current_position();
+
         let c = self.consume()?;
         match c {
             // _ if c.is_whitespace() => self.lex(),
-            ' ' | '\t' => Ok(Token::space(line, column)),
+            ' ' | '\t' => {
+                let end = self.current_position();
+                Ok(Token::space(Range { start, end }))
+            }
             '\r' if self.peek(0) == Some('\n') => {
                 self.consume()?; // skip '\n'
-                Ok(Token::newline(line, column))
+                let end = self.current_position();
+                Ok(Token::newline(Range { start, end }))
             }
-            '\r' | '\n' => Ok(Token::newline(line, column)),
+            '\r' | '\n' => {
+                let end = self.current_position();
+                Ok(Token::newline(Range { start, end }))
+            }
             '0' if self.peek(0) == Some('b') => {
                 self.consume()?; // skip 'b'
                 let mut n = 0;
@@ -134,7 +156,8 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::number(n as i64, line, column))
+                let end = self.current_position();
+                Ok(Token::number(n as i64, Range { start, end }))
             }
             '0' if self.peek(0) == Some('o') => {
                 self.consume()?; // skip 'o'
@@ -147,7 +170,8 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::number(n as i64, line, column))
+                let end = self.current_position();
+                Ok(Token::number(n as i64, Range { start, end }))
             }
             '0' if self.peek(0) == Some('x') => {
                 self.consume()?; // skip 'x'
@@ -160,7 +184,8 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::number(n as i64, line, column))
+                let end = self.current_position();
+                Ok(Token::number(n as i64, Range { start, end }))
             }
             '0'..='9' => {
                 let mut n = c.to_digit(10).unwrap();
@@ -172,7 +197,8 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::number(n as i64, line, column))
+                let end = self.current_position();
+                Ok(Token::number(n as i64, Range { start, end }))
             }
             // Identifiers starts with XID_Start
             // To check if a character is XID_Start, use regex crate.
@@ -186,7 +212,8 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::ident(&name, line, column))
+                let end = self.current_position();
+                Ok(Token::ident(&name, Range { start, end }))
             }
             // Symbols are a sequence of Symbol or Punctuation except for Open and Close
             _ if is_symbol_punctuation(c) => {
@@ -199,10 +226,14 @@ impl<'a> Lexer<'a> {
                         break;
                     }
                 }
-                Ok(Token::symbol(&name, line, column))
+                let end = self.current_position();
+                Ok(Token::symbol(&name, Range { start, end }))
             }
             // Open and Close Puncutuation are tokens by themselves
-            _ if is_open_close(c) => Ok(Token::symbol(&c.to_string(), line, column)),
+            _ if is_open_close(c) => {
+                let end = self.current_position();
+                Ok(Token::symbol(&c.to_string(), Range { start, end }))
+            }
             _ => Err(anyhow!("Unexpected character: {}", c)),
         }
     }

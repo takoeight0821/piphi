@@ -1,90 +1,133 @@
 use super::*;
+use pretty_assertions::assert_eq;
+
+///
+/// Builds a vector of tokens from a vector of string-token pairs.
+///
+/// # Arguments
+///
+/// * `tokens` - A vector of string-token pairs.
+///
+/// # Returns
+///
+/// A vector of tokens with positions.
+fn build_testcase(tokens: Vec<(&str, TokenKind)>) -> Vec<Token> {
+    let mut result = Vec::new();
+    let mut offset = 0;
+    let mut line = 0;
+    let mut column = 0;
+    for (s, kind) in tokens {
+        let start = Position {
+            offset,
+            line,
+            column,
+        };
+        offset += s.len();
+        if matches!(kind, TokenKind::Newline) {
+            line += 1;
+            column = 0;
+        } else {
+            column += s.len();
+        }
+        let end = Position {
+            offset,
+            line,
+            column,
+        };
+        result.push(Token {
+            kind,
+            range: Range { start, end },
+        });
+    }
+    result
+}
 
 #[test]
 fn test_lexer() {
+    use TokenKind::*;
     let testcases = vec![
         (
             "1 + 2",
             vec![
-                Token::number(1, 0, 0),
-                Token::space(0, 1),
-                Token::symbol("+", 0, 2),
-                Token::space(0, 3),
-                Token::number(2, 0, 4),
+                ("1", Number(1)),
+                (" ", Space),
+                ("+", Symbol("+".to_string())),
+                (" ", Space),
+                ("2", Number(2)),
             ],
         ),
         (
             "{ x -> x }",
             vec![
-                Token::symbol("{", 0, 0),
-                Token::space(0, 1),
-                Token::ident("x", 0, 2),
-                Token::space(0, 3),
-                Token::symbol("->", 0, 4),
-                Token::space(0, 6),
-                Token::ident("x", 0, 7),
-                Token::space(0, 8),
-                Token::symbol("}", 0, 9),
+                ("{", Symbol("{".to_string())),
+                (" ", Space),
+                ("x", Ident("x".to_string())),
+                (" ", Space),
+                ("->", Symbol("->".to_string())),
+                (" ", Space),
+                ("x", Ident("x".to_string())),
+                (" ", Space),
+                ("}", Symbol("}".to_string())),
             ],
         ),
         (
             "let x = 1\n in x + 2",
             vec![
-                Token::ident("let", 0, 0),
-                Token::space(0, 3),
-                Token::ident("x", 0, 4),
-                Token::space(0, 5),
-                Token::symbol("=", 0, 6),
-                Token::space(0, 7),
-                Token::number(1, 0, 8),
-                Token::newline(0, 9),
-                Token::space(1, 0),
-                Token::ident("in", 1, 1),
-                Token::space(1, 3),
-                Token::ident("x", 1, 4),
-                Token::space(1, 5),
-                Token::symbol("+", 1, 6),
-                Token::space(1, 7),
-                Token::number(2, 1, 8),
+                ("let", Ident("let".to_string())),
+                (" ", Space),
+                ("x", Ident("x".to_string())),
+                (" ", Space),
+                ("=", Symbol("=".to_string())),
+                (" ", Space),
+                ("1", Number(1)),
+                ("\n", Newline),
+                (" ", Space),
+                ("in", Ident("in".to_string())),
+                (" ", Space),
+                ("x", Ident("x".to_string())),
+                (" ", Space),
+                ("+", Symbol("+".to_string())),
+                (" ", Space),
+                ("2", Number(2)),
             ],
         ),
         (
             "get (# 0)",
             vec![
-                Token::ident("get", 0, 0),
-                Token::space(0, 3),
-                Token::symbol("(", 0, 4),
-                Token::symbol("#", 0, 5),
-                Token::space(0, 6),
-                Token::number(0, 0, 7),
-                Token::symbol(")", 0, 8),
+                ("get", Ident("get".to_string())),
+                (" ", Space),
+                ("(", Symbol("(".to_string())),
+                ("#", Symbol("#".to_string())),
+                (" ", Space),
+                ("0", Number(0)),
+                (")", Symbol(")".to_string())),
             ],
         ),
         (
             "((~~))",
             vec![
-                Token::symbol("(", 0, 0),
-                Token::symbol("(", 0, 1),
-                Token::symbol("~~", 0, 2),
-                Token::symbol(")", 0, 4),
-                Token::symbol(")", 0, 5),
+                ("(", Symbol("(".to_string())),
+                ("(", Symbol("(".to_string())),
+                ("~~", Symbol("~~".to_string())),
+                (")", Symbol(")".to_string())),
+                (")", Symbol(")".to_string())),
             ],
         ),
         (
             "「こんにちは」",
             vec![
-                Token::symbol("「", 0, 0),
-                Token::ident("こんにちは", 0, 1),
-                Token::symbol("」", 0, 6),
+                ("「", Symbol("「".to_string())),
+                ("こんにちは", Ident("こんにちは".to_string())),
+                ("」", Symbol("」".to_string())),
             ],
         ),
-        ("0b1010", vec![Token::number(0b1010, 0, 0)]),
-        ("0o755", vec![Token::number(0o755, 0, 0)]),
-        ("0xDEADBEAF", vec![Token::number(0xDEADBEAF, 0, 0)]),
+        ("0b1010", vec![("0b1010", Number(0b1010))]),
+        ("0o755", vec![("0o755", Number(0o755))]),
+        ("0xDEADBEEF", vec![("0xDEADBEEF", Number(0xDEADBEEF))]),
     ];
     for (source, expected) in testcases {
         match tokenize(source) {
-            Ok(tokens) => assert_eq!(tokens, expected),
+            Ok(tokens) => assert_eq!(tokens, build_testcase(expected)),
             Err(e) => panic!("{}", e),
         }
     }
