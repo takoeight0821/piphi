@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     let src = format!("{}", expr);
 
-    let tokens = parser::tokenize(&src)?;
+    let tokens = parser::lexer::tokenize(&src)?;
     for token in &tokens {
         println!("{}", token);
     }
