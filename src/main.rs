@@ -25,7 +25,7 @@ fn main() -> Result<()> {
         ),
     ]);
     let right = Expr::apply(&fun, &Expr::number(1));
-    let left = Expr::variable("get");
+    let left = Expr::variable(".get");
     let expr = Expr::apply(&left, &right);
 
     println!("{}", expr);

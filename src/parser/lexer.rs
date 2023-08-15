@@ -205,7 +205,7 @@ impl<'a> Lexer<'a> {
                 let end = self.current_position();
                 Ok(Token::number(n as i64, Range { start, end }))
             }
-            // Identifiers starts with XID_Start
+            // Identifiers starts with XID_Start | '_' | '.'
             // To check if a character is XID_Start, use regex crate.
             _ if is_ident_start(c) => {
                 let mut name = c.to_string();
@@ -245,7 +245,7 @@ impl<'a> Lexer<'a> {
 }
 
 fn is_ident_start(c: char) -> bool {
-    regex::Regex::new(r"\p{XID_Start}")
+    regex::Regex::new(r"\p{XID_Start}|_|\.")
         .unwrap()
         .is_match(&c.to_string())
 }

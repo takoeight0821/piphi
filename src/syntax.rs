@@ -133,20 +133,6 @@ impl Pat {
             kind: PatKind::Number(n),
         }
     }
-
-    /// Returns true if the pattern is a function pattern.
-    /// A function pattern is a pattern that starts with a This (#) pattern.
-    pub fn is_function(&self) -> bool {
-        match &self.kind {
-            PatKind::Sequence(patterns) => matches!(
-                patterns.get(0),
-                Some(Pat {
-                    kind: PatKind::This,
-                })
-            ),
-            _ => false,
-        }
-    }
 }
 
 impl Display for Pat {
@@ -178,7 +164,7 @@ impl Display for PatKind {
             PatKind::Sequence(_) => fmt::Result::Ok(()),
             PatKind::This => write!(f, "#"),
             PatKind::Variable(ident) => write!(f, "{}", ident.name),
-            PatKind::Label(ident) => write!(f, "{}", ident.name),
+            PatKind::Label(ident) => write!(f, ".{}", ident.name),
             PatKind::Number(n) => write!(f, "{}", n),
         }
     }

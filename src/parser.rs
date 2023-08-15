@@ -1,12 +1,14 @@
 use std::rc::Rc;
 
 use self::lexer::{Token, TokenKind};
-use crate::syntax::{Clause, Expr, Ident, Pat};
+use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
 
 pub mod lexer;
 pub mod range;
 
+/// Parses the given tokens into an AST.
+/// Tokens must not include spaces and newlines.
 pub fn parse(tokens: Vec<lexer::Token>) -> Result<Rc<Expr>> {
     let mut parser = Parser::new(tokens);
     parser.parse()
@@ -18,10 +20,13 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// Creates a new parser from the given tokens.
+    /// Tokens must not include spaces and newlines.
     pub fn new(tokens: Vec<lexer::Token>) -> Self {
         Self { tokens, current: 0 }
     }
 
+    /// Returns the AST of the expression from parsing the tokens.
     pub fn parse(&mut self) -> Result<Rc<Expr>> {
         self.expr()
     }
@@ -56,7 +61,7 @@ impl Parser {
         self.apply()
     }
 
-    // apply ::= term (term)*
+    /// apply ::= term (term)*
     fn apply(&mut self) -> Result<Rc<Expr>> {
         fn build_apply(terms: Vec<Rc<Expr>>) -> Rc<Expr> {
             let mut iter = terms.into_iter();
@@ -78,7 +83,7 @@ impl Parser {
         }
     }
 
-    // term ::= atom | codata
+    /// term ::= atom | codata
     fn term(&mut self) -> Result<Rc<Expr>> {
         if let Ok(atom) = self.atom() {
             Ok(atom)
@@ -89,7 +94,7 @@ impl Parser {
         }
     }
 
-    // atom ::= identifier | number | '(' expr ')'
+    /// atom ::= identifier | number | '(' expr ')'
     fn atom(&mut self) -> Result<Rc<Expr>> {
         if let Ok(ident) = self.identifier() {
             Ok(Expr::variable(&ident))
@@ -106,7 +111,7 @@ impl Parser {
         }
     }
 
-    // codata ::= '{' clause (',' clause)* '}'
+    /// codata ::= '{' clause (',' clause)* '}'
     fn codata(&mut self) -> Result<Rc<Expr>> {
         if !self.match_token(&TokenKind::Symbol("{".to_string())) {
             return Err(self.expected_error("'{{'"));
@@ -128,7 +133,7 @@ impl Parser {
         Ok(Expr::codata(clauses))
     }
 
-    // clause ::= pattern '->' expr
+    /// clause ::= pattern '->' expr
     fn clause(&mut self) -> Result<(Pat, Rc<Expr>)> {
         let pat = self.pattern()?;
         if !self.match_token(&TokenKind::Symbol("->".to_string())) {
@@ -138,12 +143,12 @@ impl Parser {
         Ok((pat, expr))
     }
 
-    // pattern ::= pat_sequence
+    /// pattern ::= pat_sequence
     fn pattern(&mut self) -> Result<Pat> {
         self.pat_sequence()
     }
 
-    // pat_sequence ::= pat_term (pat_term)*
+    /// pat_sequence ::= pat_term (pat_term)*
     fn pat_sequence(&mut self) -> Result<Pat> {
         let mut pats = vec![];
         while let Ok(pat) = self.pat_term() {
@@ -151,15 +156,21 @@ impl Parser {
         }
         if pats.is_empty() {
             Err(self.expected_error("pattern sequence"))
+        } else if pats.len() == 1 {
+            Ok(pats.pop().unwrap())
         } else {
             Ok(Pat::sequence(pats))
         }
     }
 
-    // pat_term ::= identifier | number | '#' | '(' pat_sequence ')'
+    /// pat_term ::= identifier | number | '#' | '(' pat_sequence ')'
     fn pat_term(&mut self) -> Result<Pat> {
         if let Ok(ident) = self.identifier() {
-            Ok(Pat::variable(&ident))
+            if ident.starts_with('.') {
+                Ok(Pat::label(ident.strip_prefix('.').unwrap()))
+            } else {
+                Ok(Pat::variable(&ident))
+            }
         } else if let Ok(number) = self.number() {
             Ok(Pat::number(number))
         } else if self.match_token(&TokenKind::Symbol("#".to_string())) {
