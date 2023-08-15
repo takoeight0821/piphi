@@ -9,6 +9,23 @@ use std::str::Chars;
 #[cfg(test)]
 mod tests;
 
+pub fn tokenize(source: &str) -> Result<Vec<Token>> {
+    let mut lexer = Lexer::new(source);
+    let mut tokens = Vec::new();
+    while let Ok(token) = lexer.lex() {
+        tokens.push(token);
+    }
+    Ok(tokens)
+}
+
+pub fn remove_whitespace(tokens: &[Token]) -> Vec<Token> {
+    tokens
+        .iter()
+        .filter(|token| !matches!(token.kind, TokenKind::Space | TokenKind::Newline))
+        .cloned()
+        .collect()
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -74,10 +91,10 @@ impl Display for Token {
 }
 
 pub struct Lexer<'a> {
-    pub(crate) input: Chars<'a>,
-    pub(crate) pos: usize,
-    pub(crate) line: usize,
-    pub(crate) column: usize,
+    input: Chars<'a>,
+    pos: usize,
+    line: usize,
+    column: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -90,7 +107,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub(crate) fn consume(&mut self) -> Result<char> {
+    fn consume(&mut self) -> Result<char> {
         let c = self.input.next().context("unexpected EOF")?;
         self.pos += c.len_utf8();
         if c == '\n' {
@@ -102,11 +119,11 @@ impl<'a> Lexer<'a> {
         Ok(c)
     }
 
-    pub(crate) fn peek(&self, i: usize) -> Option<char> {
+    fn peek(&self, i: usize) -> Option<char> {
         self.input.clone().nth(i)
     }
 
-    pub(crate) fn current_position(&self) -> Position {
+    fn current_position(&self) -> Position {
         Position {
             offset: self.pos,
             line: self.line,
@@ -114,7 +131,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub(crate) fn lex(&mut self) -> Result<Token> {
+    fn lex(&mut self) -> Result<Token> {
         let start = self.current_position();
 
         let c = self.consume()?;
@@ -227,36 +244,27 @@ impl<'a> Lexer<'a> {
     }
 }
 
-pub(crate) fn is_ident_start(c: char) -> bool {
+fn is_ident_start(c: char) -> bool {
     regex::Regex::new(r"\p{XID_Start}")
         .unwrap()
         .is_match(&c.to_string())
 }
 
-pub(crate) fn is_ident_continue(c: char) -> bool {
+fn is_ident_continue(c: char) -> bool {
     regex::Regex::new(r"\p{XID_Continue}")
         .unwrap()
         .is_match(&c.to_string())
 }
 
-pub(crate) fn is_symbol_punctuation(c: char) -> bool {
+fn is_symbol_punctuation(c: char) -> bool {
     regex::Regex::new(r"\p{Symbol}|\p{Punctuation}")
         .unwrap()
         .is_match(&c.to_string())
         && !is_open_close(c)
 }
 
-pub(crate) fn is_open_close(c: char) -> bool {
+fn is_open_close(c: char) -> bool {
     regex::Regex::new(r"\p{Open_Punctuation}|\p{Close_Punctuation}")
         .unwrap()
         .is_match(&c.to_string())
-}
-
-pub fn tokenize(source: &str) -> Result<Vec<Token>> {
-    let mut lexer = Lexer::new(source);
-    let mut tokens = Vec::new();
-    while let Ok(token) = lexer.lex() {
-        tokens.push(token);
-    }
-    Ok(tokens)
 }

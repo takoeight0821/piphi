@@ -2,6 +2,8 @@ mod parser;
 mod syntax;
 use anyhow::Result;
 
+use crate::parser::lexer::remove_whitespace;
+
 fn main() -> Result<()> {
     use syntax::*;
 
@@ -16,7 +18,7 @@ fn main() -> Result<()> {
         Clause::new(
             &Pat::sequence(vec![
                 Pat::label("set"),
-                Pat::sequence(vec![Pat::this(), Pat::variable("_")]),
+                Pat::sequence(vec![Pat::this(), Pat::variable("p")]),
                 Pat::variable("y"),
             ]),
             &Expr::apply(&Expr::variable("fun"), &Expr::variable("y")),
@@ -31,9 +33,9 @@ fn main() -> Result<()> {
     let src = format!("{}", expr);
 
     let tokens = parser::lexer::tokenize(&src)?;
-    for token in &tokens {
-        println!("{}", token);
-    }
+
+    let expr = parser::parse(remove_whitespace(&tokens))?;
+    println!("{}", expr);
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct Expr {
-    pub(crate) kind: ExprKind,
+    kind: ExprKind,
 }
 
 impl Display for Expr {
