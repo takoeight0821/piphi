@@ -1,8 +1,7 @@
-use std::rc::Rc;
-
 use self::lexer::{Token, TokenKind};
 use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
+use std::rc::Rc;
 
 pub mod lexer;
 pub mod range;
