@@ -97,7 +97,11 @@ impl Parser {
     /// atom ::= identifier | number | '(' expr ')'
     fn atom(&mut self) -> Result<Rc<Expr>> {
         if let Ok(ident) = self.identifier() {
-            Ok(Expr::variable(&ident))
+            if ident.starts_with('.') {
+                Ok(Expr::label(ident.strip_prefix('.').unwrap()))
+            } else {
+                Ok(Expr::variable(&ident))
+            }
         } else if let Ok(number) = self.number() {
             Ok(Expr::number(number))
         } else if self.match_token(&TokenKind::Symbol("(".to_string())) {

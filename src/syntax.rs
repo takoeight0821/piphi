@@ -23,6 +23,14 @@ impl Expr {
         })
     }
 
+    pub fn label(name: &str) -> Rc<Expr> {
+        Rc::new(Expr {
+            kind: ExprKind::Label(Ident {
+                name: name.to_string(),
+            }),
+        })
+    }
+
     pub fn number(n: i64) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Number(n),
@@ -45,6 +53,7 @@ impl Expr {
 #[derive(Debug, Clone)]
 pub enum ExprKind {
     Variable(Ident),
+    Label(Ident),
     Number(i64),
     Apply(Rc<Expr>, Rc<Expr>),
     Codata(Vec<Clause>),
@@ -54,6 +63,7 @@ impl Display for ExprKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             ExprKind::Variable(ident) => write!(f, "{}", ident.name),
+            ExprKind::Label(ident) => write!(f, ".{}", ident.name),
             ExprKind::Number(n) => write!(f, "{}", n),
             ExprKind::Apply(left, right) => write!(f, "({} {})", left, right),
             ExprKind::Codata(clauses) => {
