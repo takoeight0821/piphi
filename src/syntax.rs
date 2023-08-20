@@ -7,7 +7,8 @@ use crate::parser::range::Range;
 
 #[derive(Debug, Clone)]
 pub struct Expr {
-    kind: ExprKind,
+    pub kind: ExprKind,
+    pub range: Range,
 }
 
 impl Display for Expr {
@@ -17,37 +18,42 @@ impl Display for Expr {
 }
 
 impl Expr {
-    pub fn variable(name: &str) -> Rc<Expr> {
+    pub fn variable(name: &str, range: Range) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Variable(Ident {
                 name: name.to_string(),
             }),
+            range,
         })
     }
 
-    pub fn label(name: &str) -> Rc<Expr> {
+    pub fn label(name: &str, range: Range) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Label(Ident {
                 name: name.to_string(),
             }),
+            range,
         })
     }
 
-    pub fn number(n: i64) -> Rc<Expr> {
+    pub fn number(n: i64, range: Range) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Number(n),
+            range,
         })
     }
 
-    pub fn apply(left: &Rc<Expr>, right: &Rc<Expr>) -> Rc<Expr> {
+    pub fn apply(left: &Rc<Expr>, right: &Rc<Expr>, range: Range) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Apply(left.clone(), right.clone()),
+            range,
         })
     }
 
-    pub fn codata(clauses: Vec<Clause>) -> Rc<Expr> {
+    pub fn codata(clauses: Vec<Clause>, range: Range) -> Rc<Expr> {
         Rc::new(Expr {
             kind: ExprKind::Codata(clauses),
+            range,
         })
     }
 }
