@@ -1,4 +1,7 @@
-use self::lexer::{Token, TokenKind};
+use self::{
+    lexer::{Token, TokenKind},
+    range::{Position, Range},
+};
 use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
 use std::rc::Rc;
@@ -162,22 +165,36 @@ impl Parser {
         } else if pats.len() == 1 {
             Ok(pats.pop().unwrap())
         } else {
-            Ok(Pat::sequence(pats))
+            let range = Range {
+                start: pats.first().unwrap().range.start,
+                end: pats.last().unwrap().range.end,
+            };
+            Ok(Pat::sequence(pats, range))
         }
     }
 
     /// pat_term ::= identifier | number | '#' | '(' pat_sequence ')'
     fn pat_term(&mut self) -> Result<Pat> {
+        let start = self
+            .peek()
+            .map_or(Position::default(), |token| token.range.start);
+        let end = self
+            .peek()
+            .map_or(Position::default(), |token| token.range.end);
+
         if let Ok(ident) = self.identifier() {
             if ident.starts_with('.') {
-                Ok(Pat::label(ident.strip_prefix('.').unwrap()))
+                Ok(Pat::label(
+                    ident.strip_prefix('.').unwrap(),
+                    Range { start, end },
+                ))
             } else {
-                Ok(Pat::variable(&ident))
+                Ok(Pat::variable(&ident, Range { start, end }))
             }
         } else if let Ok(number) = self.number() {
-            Ok(Pat::number(number))
+            Ok(Pat::number(number, Range { start, end }))
         } else if self.match_token(&TokenKind::Symbol("#".to_string())) {
-            Ok(Pat::this())
+            Ok(Pat::this(Range { start, end }))
         } else if self.match_token(&TokenKind::Symbol("(".to_string())) {
             let pat = self.pattern()?;
             if !self.match_token(&TokenKind::Symbol(")".to_string())) {

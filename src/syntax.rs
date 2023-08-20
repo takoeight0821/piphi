@@ -3,6 +3,8 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::rc::Rc;
 
+use crate::parser::range::Range;
+
 #[derive(Debug, Clone)]
 pub struct Expr {
     kind: ExprKind,
@@ -107,40 +109,46 @@ impl Display for Clause {
 #[derive(Debug, Clone)]
 pub struct Pat {
     pub kind: PatKind,
+    pub range: Range,
 }
 
 impl Pat {
-    pub fn sequence(patterns: Vec<Pat>) -> Pat {
+    pub fn sequence(patterns: Vec<Pat>, range: Range) -> Pat {
         Pat {
             kind: PatKind::Sequence(patterns),
+            range,
         }
     }
 
-    pub fn this() -> Pat {
+    pub fn this(range: Range) -> Pat {
         Pat {
             kind: PatKind::This,
+            range,
         }
     }
 
-    pub fn variable(name: &str) -> Pat {
+    pub fn variable(name: &str, range: Range) -> Pat {
         Pat {
             kind: PatKind::Variable(Ident {
                 name: name.to_string(),
             }),
+            range,
         }
     }
 
-    pub fn label(name: &str) -> Pat {
+    pub fn label(name: &str, range: Range) -> Pat {
         Pat {
             kind: PatKind::Label(Ident {
                 name: name.to_string(),
             }),
+            range,
         }
     }
 
-    pub fn number(n: i64) -> Pat {
+    pub fn number(n: i64, range: Range) -> Pat {
         Pat {
             kind: PatKind::Number(n),
+            range,
         }
     }
 }
