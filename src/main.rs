@@ -1,5 +1,6 @@
 mod parser;
 mod syntax;
+
 use anyhow::Result;
 
 use crate::parser::{lexer::remove_whitespace, range::Range};
@@ -12,46 +13,50 @@ fn main() -> Result<()> {
             Clause::new(
                 &Pat::sequence(
                     vec![
-                        Pat::label("get", Range::default()),
+                        Pat::label("get", Default::default()),
                         Pat::sequence(
                             vec![
-                                Pat::this(Range::default()),
-                                Pat::variable("x", Range::default()),
+                                Pat::this(Default::default()),
+                                Pat::variable("x", Default::default()),
                             ],
-                            Range::default(),
+                            Default::default(),
                         ),
                     ],
-                    Range::default(),
+                    Default::default(),
                 ),
-                &Expr::variable("x", Range::default()),
+                &Expr::variable("x", Default::default()),
             ),
             Clause::new(
                 &Pat::sequence(
                     vec![
-                        Pat::label("set", Range::default()),
+                        Pat::label("set", Default::default()),
                         Pat::sequence(
                             vec![
-                                Pat::this(Range::default()),
-                                Pat::variable("p", Range::default()),
+                                Pat::this(Default::default()),
+                                Pat::variable("p", Default::default()),
                             ],
-                            Range::default(),
+                            Default::default(),
                         ),
-                        Pat::variable("y", Range::default()),
+                        Pat::variable("y", Default::default()),
                     ],
                     Range::default(),
                 ),
                 &Expr::apply(
-                    &Expr::variable("fun", Range::default()),
-                    &Expr::variable("y", Range::default()),
+                    &Expr::variable("fun", Default::default()),
+                    &Expr::variable("y", Default::default()),
                     Range::default(),
                 ),
             ),
         ],
         Range::default(),
     );
-    let right = Expr::apply(&fun, &Expr::number(1, Range::default()), Range::default());
-    let left = Expr::variable(".get", Range::default());
-    let expr = Expr::apply(&left, &right, Range::default());
+    let right = Expr::apply(
+        &fun,
+        &Expr::number(1, Default::default()),
+        Default::default(),
+    );
+    let left = Expr::variable(".get", Default::default());
+    let expr = Expr::apply(&left, &right, Default::default());
 
     println!("{}", expr);
 

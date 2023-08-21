@@ -1,6 +1,6 @@
 use self::{
     lexer::{Token, TokenKind},
-    range::{Position, Range},
+    range::Range,
 };
 use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
@@ -11,7 +11,7 @@ pub mod range;
 
 /// Parses the given tokens into an AST.
 /// Tokens must not include spaces and newlines.
-pub fn parse(tokens: Vec<lexer::Token>) -> Result<Rc<Expr>> {
+pub fn parse(tokens: Vec<Token>) -> Result<Rc<Expr>> {
     let mut parser = Parser::new(tokens);
     parser.parse()
 }
@@ -69,7 +69,7 @@ impl Parser {
             let mut iter = terms.into_iter();
             let mut expr = iter.next().unwrap();
             for term in iter {
-                expr = Expr::apply(&expr, &term, Range::merge(&expr.range, &term.range));
+                expr = Expr::apply(&expr, &term, expr.range + term.range);
             }
             expr
         }
@@ -98,7 +98,7 @@ impl Parser {
 
     /// atom ::= identifier | number | '(' expr ')'
     fn atom(&mut self) -> Result<Rc<Expr>> {
-        let range = self.peek().map_or(Range::default(), |token| token.range);
+        let range = self.peek().map_or(Default::default(), |token| token.range);
 
         if let Ok(ident) = self.identifier() {
             if ident.starts_with('.') {
@@ -123,7 +123,7 @@ impl Parser {
     fn codata(&mut self) -> Result<Rc<Expr>> {
         let start = self
             .peek()
-            .map_or(Position::default(), |token| token.range.start);
+            .map_or(Default::default(), |token| token.range.start);
 
         if !self.match_token(&TokenKind::Symbol("{".to_string())) {
             return Err(self.expected_error("'{{'"));
@@ -142,7 +142,7 @@ impl Parser {
 
         let end = self
             .peek()
-            .map_or(Position::default(), |token| token.range.end);
+            .map_or(Default::default(), |token| token.range.end);
         if !self.match_token(&TokenKind::Symbol("}".to_string())) {
             return Err(self.expected_error("'}}'"));
         }
@@ -185,7 +185,7 @@ impl Parser {
 
     /// pat_term ::= identifier | number | '#' | '(' pat_sequence ')'
     fn pat_term(&mut self) -> Result<Pat> {
-        let range = self.peek().map_or(Range::default(), |token| token.range);
+        let range = self.peek().map_or(Default::default(), |token| token.range);
 
         if let Ok(ident) = self.identifier() {
             if ident.starts_with('.') {

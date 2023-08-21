@@ -1,14 +1,18 @@
+use std::ops::Add;
+
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
 }
 
-impl Range {
-    pub fn merge(r1: &Range, r2: &Range) -> Range {
+impl Add for Range {
+    type Output = Range;
+
+    fn add(self, other: Range) -> Range {
         Range {
-            start: r1.start,
-            end: r2.end,
+            start: self.start,
+            end: other.end,
         }
     }
 }
