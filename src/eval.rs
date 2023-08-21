@@ -1,5 +1,4 @@
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
-use anyhow::{anyhow, Result};
 use std::{collections::HashMap, rc::Rc};
 
 /// Value
@@ -79,32 +78,32 @@ impl Evaluator {
     }
 
     /// Evaluate an expression
-    pub fn eval(&mut self, env: Rc<VarEnv>, expr: &Expr) -> Result<Value> {
+    pub fn eval(&mut self, env: Rc<VarEnv>, expr: &Expr) -> Value {
         use ExprKind::*;
         match &expr.kind {
             Variable(x) => env
                 .get(x)
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("unbound variable: {}", x.name)),
-            Label(x) => Ok(Value::accessor(x.clone())),
-            Number(n) => Ok(Value::number(*n)),
+                .unwrap_or_else(|| panic!("unbound variable: {}", x.name)),
+            Label(x) => Value::accessor(x.clone()),
+            Number(n) => Value::number(*n),
             Apply(f, x) => {
-                let f = self.eval(env.clone(), f)?;
-                let x = self.eval(env.clone(), x)?;
+                let f = self.eval(env.clone(), f);
+                let x = self.eval(env.clone(), x);
                 self.apply(env, f, x)
             }
             Codata(clauses) if clauses.len() == 1 => {
                 self.to_function(env, clauses.first().unwrap())
             }
             Codata(clauses) => {
-                anyhow::bail!("not implemented: codata with {} clauses", clauses.len())
+                todo!("not implemented: codata with {} clauses", clauses.len())
             }
         }
     }
 
     /// Turn a clause into a function.
     /// Restriction: the clause must have a sequence of patterns that start with a `#` and other patterns must be variables.
-    fn to_function(&self, env: Rc<VarEnv>, clause: &Clause) -> Result<Value> {
+    fn to_function(&self, env: Rc<VarEnv>, clause: &Clause) -> Value {
         match clause {
             Clause {
                 pattern:
@@ -125,16 +124,16 @@ impl Evaluator {
                     }
 
                     let args: Vec<Ident> = ps[1..].iter().map(get_name).collect();
-                    Ok(Value::function(env.clone(), args, body.clone()))
+                    Value::function(env.clone(), args, body.clone())
                 } else {
-                    anyhow::bail!("cannot convert clause to function: {}", clause)
+                    panic!("cannot convert clause to function: {}", clause)
                 }
             }
-            _ => anyhow::bail!("cannot convert clause to function: {}", clause),
+            _ => panic!("cannot convert clause to function: {}", clause),
         }
     }
 
-    fn apply(&self, env: Rc<VarEnv>, f: Value, x: Value) -> Result<Value> {
+    fn apply(&mut self, env: Rc<VarEnv>, f: Value, x: Value) -> Value {
         match f {
             Value {
                 kind:
@@ -145,14 +144,17 @@ impl Evaluator {
                     }),
             } => {
                 if args.len() != 1 {
-                    anyhow::bail!(
+                    todo!(
                         "not implemented: partial application of function with {} arguments",
                         args.len()
                     )
                 }
-                anyhow::bail!("not implemented: function application")
+                let mut env = (*env).clone();
+                env.extend(captures.iter().map(|(k, v)| (k.clone(), v.clone())));
+                env.insert(args[0].clone(), x);
+                self.eval(Rc::new(env), &body)
             }
-            _ => anyhow::bail!("cannot apply non-function: {:?}", f),
+            _ => panic!("cannot apply non-function: {:?}", f),
         }
     }
 }
@@ -172,6 +174,36 @@ mod tests {
         let ast = parse(remove_whitespace(&tokens)).unwrap();
         let mut evaluator = super::Evaluator::new();
         let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value.unwrap(), super::Value::number(1));
+        assert_eq!(value, super::Value::number(1));
+    }
+
+    #[test]
+    fn test_record() {
+        let src = ".get { .get # -> 1 }";
+        let tokens = tokenize(src).unwrap();
+        let ast = parse(remove_whitespace(&tokens)).unwrap();
+        let mut evaluator = super::Evaluator::new();
+        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+        assert_eq!(value, super::Value::number(1));
+    }
+
+    #[test]
+    fn test_multi_args() {
+        let src = "{ # x y -> x } 1 2";
+        let tokens = tokenize(src).unwrap();
+        let ast = parse(remove_whitespace(&tokens)).unwrap();
+        let mut evaluator = super::Evaluator::new();
+        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+        assert_eq!(value, super::Value::number(1));
+    }
+
+    #[test]
+    fn test_complex() {
+        let src = ".get ({ .get (# x y) -> x } 1 2)";
+        let tokens = tokenize(src).unwrap();
+        let ast = parse(remove_whitespace(&tokens)).unwrap();
+        let mut evaluator = super::Evaluator::new();
+        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+        assert_eq!(value, super::Value::number(1));
     }
 }

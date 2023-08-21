@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     println!("{}", ast);
 
     let mut evaluator = Evaluator::new();
-    let value = evaluator.eval(Rc::new(HashMap::new()), &ast)?;
+    let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
 
     println!("{:?}", value);
 
