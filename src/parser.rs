@@ -10,7 +10,7 @@ pub mod range;
 
 /// Parses the given tokens into an AST.
 /// Tokens must not include spaces and newlines.
-pub fn parse(tokens: Vec<Token>) -> Result<Box<Expr>> {
+pub fn parse(tokens: Vec<Token>) -> Result<Expr> {
     let mut parser = Parser::new(tokens);
     parser.parse()
 }
@@ -28,7 +28,7 @@ impl Parser {
     }
 
     /// Returns the AST of the expression from parsing the tokens.
-    pub fn parse(&mut self) -> Result<Box<Expr>> {
+    pub fn parse(&mut self) -> Result<Expr> {
         self.expr()
     }
 
@@ -58,12 +58,12 @@ impl Parser {
     }
 
     /// expr ::= apply
-    fn expr(&mut self) -> Result<Box<Expr>> {
+    fn expr(&mut self) -> Result<Expr> {
         self.apply()
     }
 
     /// apply ::= term (term)*
-    fn apply(&mut self) -> Result<Box<Expr>> {
+    fn apply(&mut self) -> Result<Expr> {
         fn build_apply(terms: Vec<Expr>) -> Expr {
             let mut iter = terms.into_iter();
             let mut expr: Expr = iter.next().unwrap();
@@ -75,17 +75,17 @@ impl Parser {
 
         let mut terms: Vec<Expr> = vec![];
         while let Ok(term) = self.term() {
-            terms.push(*term);
+            terms.push(term);
         }
         if terms.is_empty() {
             Err(self.expected_error("term"))
         } else {
-            Ok(Box::new(build_apply(terms)))
+            Ok(build_apply(terms))
         }
     }
 
     /// term ::= atom | codata
-    fn term(&mut self) -> Result<Box<Expr>> {
+    fn term(&mut self) -> Result<Expr> {
         if let Ok(atom) = self.atom() {
             Ok(atom)
         } else if let Ok(codata) = self.codata() {
@@ -96,20 +96,17 @@ impl Parser {
     }
 
     /// atom ::= identifier | number | '(' expr ')'
-    fn atom(&mut self) -> Result<Box<Expr>> {
+    fn atom(&mut self) -> Result<Expr> {
         let range = self.peek().map_or(Default::default(), |token| token.range);
 
         if let Ok(ident) = self.identifier() {
             if ident.starts_with('.') {
-                Ok(Box::new(Expr::label(
-                    ident.strip_prefix('.').unwrap(),
-                    range,
-                )))
+                Ok(Expr::label(ident.strip_prefix('.').unwrap(), range))
             } else {
-                Ok(Box::new(Expr::variable(&ident, range)))
+                Ok(Expr::variable(&ident, range))
             }
         } else if let Ok(number) = self.number() {
-            Ok(Box::new(Expr::number(number, range)))
+            Ok(Expr::number(number, range))
         } else if self.match_token(&TokenKind::Symbol("(".to_string())) {
             let expr = self.expr()?;
             if !self.match_token(&TokenKind::Symbol(")".to_string())) {
@@ -122,7 +119,7 @@ impl Parser {
     }
 
     /// codata ::= '{' clause (',' clause)* '}'
-    fn codata(&mut self) -> Result<Box<Expr>> {
+    fn codata(&mut self) -> Result<Expr> {
         let start = self
             .peek()
             .map_or(Default::default(), |token| token.range.start);
@@ -148,11 +145,11 @@ impl Parser {
         if !self.match_token(&TokenKind::Symbol("}".to_string())) {
             return Err(self.expected_error("'}}'"));
         }
-        Ok(Box::new(Expr::codata(clauses, Range { start, end })))
+        Ok(Expr::codata(clauses, Range { start, end }))
     }
 
     /// clause ::= pattern '->' expr
-    fn clause(&mut self) -> Result<(Pat, Box<Expr>)> {
+    fn clause(&mut self) -> Result<(Pat, Expr)> {
         let pat = self.pattern()?;
         if !self.match_token(&TokenKind::Symbol("->".to_string())) {
             return Err(self.expected_error("'->'"));
