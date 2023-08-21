@@ -84,7 +84,7 @@ impl Display for ExprKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ident {
     pub name: String,
 }
@@ -188,6 +188,15 @@ impl Display for PatKind {
             PatKind::Variable(ident) => write!(f, "{}", ident.name),
             PatKind::Label(ident) => write!(f, ".{}", ident.name),
             PatKind::Number(n) => write!(f, "{}", n),
+        }
+    }
+}
+
+impl PatKind {
+    pub fn is_variable(&self) -> bool {
+        match self {
+            PatKind::Variable(_) => true,
+            _ => false,
         }
     }
 }
