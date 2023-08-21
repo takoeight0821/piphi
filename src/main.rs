@@ -7,8 +7,12 @@ use clap::Parser;
 use parser::lexer::remove_whitespace;
 use parser::lexer::tokenize;
 use parser::parse;
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
+use std::rc::Rc;
+
+use crate::eval::Evaluator;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -35,6 +39,11 @@ fn main() -> Result<()> {
     let ast = parse(remove_whitespace(&tokens))?;
 
     println!("{}", ast);
+
+    let mut evaluator = Evaluator::new();
+    let value = evaluator.eval(Rc::new(HashMap::new()), &ast)?;
+
+    println!("{:?}", value);
 
     Ok(())
 }

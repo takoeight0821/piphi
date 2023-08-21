@@ -1,5 +1,5 @@
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{collections::HashMap, rc::Rc};
 
 /// Value
@@ -15,7 +15,7 @@ impl Value {
         }
     }
 
-    pub fn function(captures: HashMap<Ident, Value>, args: Vec<Ident>, body: Expr) -> Value {
+    pub fn function(captures: Rc<VarEnv>, args: Vec<Ident>, body: Expr) -> Value {
         Value {
             kind: ValueKind::Function(Function {
                 captures,
@@ -53,7 +53,7 @@ pub enum ValueKind {
 /// Function
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    pub captures: VarEnv,
+    pub captures: Rc<VarEnv>,
     pub args: Vec<Ident>,
     pub body: Expr,
 }
@@ -117,7 +117,15 @@ impl Evaluator {
                 if ps.first().is_some_and(|p| p.kind == PatKind::This)
                     && ps[1..].iter().all(|p| p.kind.is_variable())
                 {
-                    todo!()
+                    fn get_name(p: &Pat) -> Ident {
+                        match &p.kind {
+                            PatKind::Variable(x) => x.clone(),
+                            _ => unreachable!(),
+                        }
+                    }
+
+                    let args: Vec<Ident> = ps[1..].iter().map(get_name).collect();
+                    Ok(Value::function(env.clone(), args, body.clone()))
                 } else {
                     anyhow::bail!("cannot convert clause to function: {}", clause)
                 }
@@ -127,6 +135,43 @@ impl Evaluator {
     }
 
     fn apply(&self, env: Rc<VarEnv>, f: Value, x: Value) -> Result<Value> {
-        todo!()
+        match f {
+            Value {
+                kind:
+                    ValueKind::Function(Function {
+                        captures,
+                        args,
+                        body,
+                    }),
+            } => {
+                if args.len() != 1 {
+                    anyhow::bail!(
+                        "not implemented: partial application of function with {} arguments",
+                        args.len()
+                    )
+                }
+                anyhow::bail!("not implemented: function application")
+            }
+            _ => anyhow::bail!("cannot apply non-function: {:?}", f),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser::{
+        lexer::{remove_whitespace, tokenize},
+        parse,
+    };
+    use std::{collections::HashMap, rc::Rc};
+
+    #[test]
+    fn test_simple() {
+        let src = "{ # x -> x } 1";
+        let tokens = tokenize(src).unwrap();
+        let ast = parse(remove_whitespace(&tokens)).unwrap();
+        let mut evaluator = super::Evaluator::new();
+        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+        assert_eq!(value.unwrap(), super::Value::number(1));
     }
 }
