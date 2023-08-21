@@ -194,9 +194,10 @@ impl Display for PatKind {
 
 impl PatKind {
     pub fn is_variable(&self) -> bool {
-        match self {
-            PatKind::Variable(_) => true,
-            _ => false,
-        }
+        matches!(self, PatKind::Variable(_))
+    }
+
+    pub fn is_label(&self) -> bool {
+        matches!(self, PatKind::Label(_))
     }
 }

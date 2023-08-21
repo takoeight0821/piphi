@@ -24,9 +24,9 @@ impl Value {
         }
     }
 
-    pub fn map(map: HashMap<Ident, Value>) -> Value {
+    pub fn object(captures: Rc<VarEnv>, map: HashMap<Ident, Expr>) -> Value {
         Value {
-            kind: ValueKind::Map(map),
+            kind: ValueKind::Object(Object { captures, map }),
         }
     }
 
@@ -44,7 +44,8 @@ pub enum ValueKind {
     /// A function
     Function(Function),
     /// A map
-    Map(HashMap<Ident, Value>),
+    /// TODO: Lazy evaluation
+    Object(Object),
     /// An accessor
     Accessor(Ident),
 }
@@ -55,6 +56,13 @@ pub struct Function {
     pub captures: Rc<VarEnv>,
     pub args: Vec<Ident>,
     pub body: Expr,
+}
+
+/// Object
+#[derive(Debug, Clone, PartialEq)]
+pub struct Object {
+    pub captures: Rc<VarEnv>,
+    pub map: HashMap<Ident, Expr>,
 }
 
 /// Environment
@@ -90,20 +98,20 @@ impl Evaluator {
             Apply(f, x) => {
                 let f = self.eval(env.clone(), f);
                 let x = self.eval(env.clone(), x);
-                self.apply(env, f, x)
+                self.apply(f, x)
             }
             Codata(clauses) if clauses.len() == 1 => {
-                self.to_function(env, clauses.first().unwrap())
+                self.eval_clause(env, clauses.first().unwrap())
             }
             Codata(clauses) => {
-                todo!("not implemented: codata with {} clauses", clauses.len())
+                todo!("codata with {} clauses", clauses.len())
             }
         }
     }
 
     /// Turn a clause into a function.
     /// Restriction: the clause must have a sequence of patterns that start with a `#` and other patterns must be variables.
-    fn to_function(&self, env: Rc<VarEnv>, clause: &Clause) -> Value {
+    fn eval_clause(&self, env: Rc<VarEnv>, clause: &Clause) -> Value {
         match clause {
             Clause {
                 pattern:
@@ -113,27 +121,41 @@ impl Evaluator {
                     },
                 body,
             } => {
-                if ps.first().is_some_and(|p| p.kind == PatKind::This)
-                    && ps[1..].iter().all(|p| p.kind.is_variable())
-                {
-                    fn get_name(p: &Pat) -> Ident {
-                        match &p.kind {
-                            PatKind::Variable(x) => x.clone(),
-                            _ => unreachable!(),
+                match &ps[..] {
+                    [this, ref args @ ..]
+                        if this.kind == PatKind::This
+                            && args.iter().all(|p| p.kind.is_variable()) =>
+                    {
+                        // Function
+                        fn get_name(p: &Pat) -> Ident {
+                            match &p.kind {
+                                PatKind::Variable(x) => x.clone(),
+                                _ => unreachable!(),
+                            }
                         }
-                    }
 
-                    let args: Vec<Ident> = ps[1..].iter().map(get_name).collect();
-                    Value::function(env.clone(), args, body.clone())
-                } else {
-                    panic!("cannot convert clause to function: {}", clause)
+                        let args = args.iter().map(get_name).collect();
+                        Value::function(env.clone(), args, body.clone())
+                    }
+                    [Pat {
+                        kind: PatKind::Label(label),
+                        ..
+                    }, Pat {
+                        kind: PatKind::This,
+                        ..
+                    }] => {
+                        let mut map = HashMap::new();
+                        map.insert(label.clone(), body.clone());
+                        Value::object(env.clone(), map)
+                    }
+                    _ => todo!("cannot convert clause to function: {}", clause),
                 }
             }
             _ => panic!("cannot convert clause to function: {}", clause),
         }
     }
 
-    fn apply(&mut self, env: Rc<VarEnv>, f: Value, x: Value) -> Value {
+    fn apply(&mut self, f: Value, x: Value) -> Value {
         match f {
             Value {
                 kind:
@@ -145,15 +167,28 @@ impl Evaluator {
             } => {
                 if args.len() != 1 {
                     todo!(
-                        "not implemented: partial application of function with {} arguments",
+                        "partial application of function with {} arguments",
                         args.len()
                     )
                 }
-                let mut env = (*env).clone();
-                env.extend(captures.iter().map(|(k, v)| (k.clone(), v.clone())));
+                let mut env = (*captures).clone();
                 env.insert(args[0].clone(), x);
                 self.eval(Rc::new(env), &body)
             }
+            Value {
+                kind: ValueKind::Accessor(label),
+            } => match x {
+                Value {
+                    kind: ValueKind::Object(Object { captures, map }),
+                } => {
+                    if let Some(body) = map.get(&label) {
+                        self.eval(captures, body)
+                    } else {
+                        panic!("no such label: {}", label.name)
+                    }
+                }
+                _ => panic!("cannot apply accessor to non-object: {:?}", x),
+            },
             _ => panic!("cannot apply non-function: {:?}", f),
         }
     }
@@ -182,6 +217,7 @@ mod tests {
         let src = ".get { .get # -> 1 }";
         let tokens = tokenize(src).unwrap();
         let ast = parse(remove_whitespace(&tokens)).unwrap();
+        dbg!(&ast);
         let mut evaluator = super::Evaluator::new();
         let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
         assert_eq!(value, super::Value::number(1));
