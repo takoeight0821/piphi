@@ -1,8 +1,7 @@
+use crate::parser::range::Range;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-
-use crate::parser::range::Range;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
