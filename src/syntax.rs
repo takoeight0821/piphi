@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::parser::range::Range;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub range: Range,
@@ -58,7 +58,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     Variable(Ident),
     Label(Ident),
@@ -86,12 +86,12 @@ impl Display for ExprKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ident {
     pub(crate) name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Clause {
     pub pattern: Pat,
     pub body: Expr,
@@ -112,7 +112,7 @@ impl Display for Clause {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Pat {
     pub kind: PatKind,
     pub range: Range,
@@ -165,7 +165,7 @@ impl Display for Pat {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PatKind {
     Sequence(Vec<Pat>),
     This,
