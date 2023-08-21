@@ -64,9 +64,9 @@ impl Parser {
 
     /// apply ::= term (term)*
     fn apply(&mut self) -> Result<Box<Expr>> {
-        fn build_apply(terms: Vec<Expr>) -> Box<Expr> {
+        fn build_apply(terms: Vec<Expr>) -> Expr {
             let mut iter = terms.into_iter();
-            let mut expr: Box<Expr> = Box::new(iter.next().unwrap());
+            let mut expr: Expr = iter.next().unwrap();
             for term in iter {
                 expr = Expr::apply(&expr, &term, expr.range + term.range);
             }
@@ -80,7 +80,7 @@ impl Parser {
         if terms.is_empty() {
             Err(self.expected_error("term"))
         } else {
-            Ok(build_apply(terms))
+            Ok(Box::new(build_apply(terms)))
         }
     }
 
@@ -101,12 +101,15 @@ impl Parser {
 
         if let Ok(ident) = self.identifier() {
             if ident.starts_with('.') {
-                Ok(Expr::label(ident.strip_prefix('.').unwrap(), range))
+                Ok(Box::new(Expr::label(
+                    ident.strip_prefix('.').unwrap(),
+                    range,
+                )))
             } else {
-                Ok(Expr::variable(&ident, range))
+                Ok(Box::new(Expr::variable(&ident, range)))
             }
         } else if let Ok(number) = self.number() {
-            Ok(Expr::number(number, range))
+            Ok(Box::new(Expr::number(number, range)))
         } else if self.match_token(&TokenKind::Symbol("(".to_string())) {
             let expr = self.expr()?;
             if !self.match_token(&TokenKind::Symbol(")".to_string())) {
@@ -145,7 +148,7 @@ impl Parser {
         if !self.match_token(&TokenKind::Symbol("}".to_string())) {
             return Err(self.expected_error("'}}'"));
         }
-        Ok(Expr::codata(clauses, Range { start, end }))
+        Ok(Box::new(Expr::codata(clauses, Range { start, end })))
     }
 
     /// clause ::= pattern '->' expr
@@ -369,6 +372,6 @@ mod tests {
 
         let parsed = parse(remove_whitespace(&tokens)).map(|x| Box::new(x.reset()));
 
-        assert_eq!(parsed.ok(), Some(expr))
+        assert_eq!(parsed.ok(), Some(Box::new(expr)))
     }
 }

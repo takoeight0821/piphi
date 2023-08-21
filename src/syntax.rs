@@ -17,43 +17,43 @@ impl Display for Expr {
 }
 
 impl Expr {
-    pub fn variable(name: &str, range: Range) -> Box<Expr> {
-        Box::new(Expr {
+    pub fn variable(name: &str, range: Range) -> Expr {
+        Expr {
             kind: ExprKind::Variable(Ident {
                 name: name.to_string(),
             }),
             range,
-        })
+        }
     }
 
-    pub fn label(name: &str, range: Range) -> Box<Expr> {
-        Box::new(Expr {
+    pub fn label(name: &str, range: Range) -> Expr {
+        Expr {
             kind: ExprKind::Label(Ident {
                 name: name.to_string(),
             }),
             range,
-        })
+        }
     }
 
-    pub fn number(n: i64, range: Range) -> Box<Expr> {
-        Box::new(Expr {
+    pub fn number(n: i64, range: Range) -> Expr {
+        Expr {
             kind: ExprKind::Number(n),
             range,
-        })
+        }
     }
 
-    pub fn apply(left: &Expr, right: &Expr, range: Range) -> Box<Expr> {
-        Box::new(Expr {
+    pub fn apply(left: &Expr, right: &Expr, range: Range) -> Expr {
+        Expr {
             kind: ExprKind::Apply(Box::new(left.clone()), Box::new(right.clone())),
             range,
-        })
+        }
     }
 
-    pub fn codata(clauses: Vec<Clause>, range: Range) -> Box<Expr> {
-        Box::new(Expr {
+    pub fn codata(clauses: Vec<Clause>, range: Range) -> Expr {
+        Expr {
             kind: ExprKind::Codata(clauses),
             range,
-        })
+        }
     }
 }
 
@@ -87,7 +87,7 @@ impl Display for ExprKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ident {
-    pub(crate) name: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
