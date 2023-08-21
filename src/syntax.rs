@@ -1,7 +1,6 @@
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
-use std::rc::Rc;
 
 use crate::parser::range::Range;
 
@@ -18,8 +17,8 @@ impl Display for Expr {
 }
 
 impl Expr {
-    pub fn variable(name: &str, range: Range) -> Rc<Expr> {
-        Rc::new(Expr {
+    pub fn variable(name: &str, range: Range) -> Box<Expr> {
+        Box::new(Expr {
             kind: ExprKind::Variable(Ident {
                 name: name.to_string(),
             }),
@@ -27,8 +26,8 @@ impl Expr {
         })
     }
 
-    pub fn label(name: &str, range: Range) -> Rc<Expr> {
-        Rc::new(Expr {
+    pub fn label(name: &str, range: Range) -> Box<Expr> {
+        Box::new(Expr {
             kind: ExprKind::Label(Ident {
                 name: name.to_string(),
             }),
@@ -36,22 +35,22 @@ impl Expr {
         })
     }
 
-    pub fn number(n: i64, range: Range) -> Rc<Expr> {
-        Rc::new(Expr {
+    pub fn number(n: i64, range: Range) -> Box<Expr> {
+        Box::new(Expr {
             kind: ExprKind::Number(n),
             range,
         })
     }
 
-    pub fn apply(left: &Rc<Expr>, right: &Rc<Expr>, range: Range) -> Rc<Expr> {
-        Rc::new(Expr {
-            kind: ExprKind::Apply(left.clone(), right.clone()),
+    pub fn apply(left: &Expr, right: &Expr, range: Range) -> Box<Expr> {
+        Box::new(Expr {
+            kind: ExprKind::Apply(Box::new(left.clone()), Box::new(right.clone())),
             range,
         })
     }
 
-    pub fn codata(clauses: Vec<Clause>, range: Range) -> Rc<Expr> {
-        Rc::new(Expr {
+    pub fn codata(clauses: Vec<Clause>, range: Range) -> Box<Expr> {
+        Box::new(Expr {
             kind: ExprKind::Codata(clauses),
             range,
         })
@@ -63,7 +62,7 @@ pub enum ExprKind {
     Variable(Ident),
     Label(Ident),
     Number(i64),
-    Apply(Rc<Expr>, Rc<Expr>),
+    Apply(Box<Expr>, Box<Expr>),
     Codata(Vec<Clause>),
 }
 

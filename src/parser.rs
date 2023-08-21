@@ -4,14 +4,13 @@ use self::{
 };
 use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
-use std::rc::Rc;
 
 pub mod lexer;
 pub mod range;
 
 /// Parses the given tokens into an AST.
 /// Tokens must not include spaces and newlines.
-pub fn parse(tokens: Vec<Token>) -> Result<Rc<Expr>> {
+pub fn parse(tokens: Vec<Token>) -> Result<Box<Expr>> {
     let mut parser = Parser::new(tokens);
     parser.parse()
 }
@@ -29,7 +28,7 @@ impl Parser {
     }
 
     /// Returns the AST of the expression from parsing the tokens.
-    pub fn parse(&mut self) -> Result<Rc<Expr>> {
+    pub fn parse(&mut self) -> Result<Box<Expr>> {
         self.expr()
     }
 
@@ -59,24 +58,24 @@ impl Parser {
     }
 
     /// expr ::= apply
-    fn expr(&mut self) -> Result<Rc<Expr>> {
+    fn expr(&mut self) -> Result<Box<Expr>> {
         self.apply()
     }
 
     /// apply ::= term (term)*
-    fn apply(&mut self) -> Result<Rc<Expr>> {
-        fn build_apply(terms: Vec<Rc<Expr>>) -> Rc<Expr> {
+    fn apply(&mut self) -> Result<Box<Expr>> {
+        fn build_apply(terms: Vec<Expr>) -> Box<Expr> {
             let mut iter = terms.into_iter();
-            let mut expr = iter.next().unwrap();
+            let mut expr: Box<Expr> = Box::new(iter.next().unwrap());
             for term in iter {
                 expr = Expr::apply(&expr, &term, expr.range + term.range);
             }
             expr
         }
 
-        let mut terms = vec![];
+        let mut terms: Vec<Expr> = vec![];
         while let Ok(term) = self.term() {
-            terms.push(term);
+            terms.push(*term);
         }
         if terms.is_empty() {
             Err(self.expected_error("term"))
@@ -86,7 +85,7 @@ impl Parser {
     }
 
     /// term ::= atom | codata
-    fn term(&mut self) -> Result<Rc<Expr>> {
+    fn term(&mut self) -> Result<Box<Expr>> {
         if let Ok(atom) = self.atom() {
             Ok(atom)
         } else if let Ok(codata) = self.codata() {
@@ -97,7 +96,7 @@ impl Parser {
     }
 
     /// atom ::= identifier | number | '(' expr ')'
-    fn atom(&mut self) -> Result<Rc<Expr>> {
+    fn atom(&mut self) -> Result<Box<Expr>> {
         let range = self.peek().map_or(Default::default(), |token| token.range);
 
         if let Ok(ident) = self.identifier() {
@@ -120,7 +119,7 @@ impl Parser {
     }
 
     /// codata ::= '{' clause (',' clause)* '}'
-    fn codata(&mut self) -> Result<Rc<Expr>> {
+    fn codata(&mut self) -> Result<Box<Expr>> {
         let start = self
             .peek()
             .map_or(Default::default(), |token| token.range.start);
@@ -150,7 +149,7 @@ impl Parser {
     }
 
     /// clause ::= pattern '->' expr
-    fn clause(&mut self) -> Result<(Pat, Rc<Expr>)> {
+    fn clause(&mut self) -> Result<(Pat, Box<Expr>)> {
         let pat = self.pattern()?;
         if !self.match_token(&TokenKind::Symbol("->".to_string())) {
             return Err(self.expected_error("'->'"));
@@ -242,7 +241,6 @@ mod tests {
     };
     use crate::syntax::{Clause, Expr, ExprKind, Pat, PatKind};
     use pretty_assertions::assert_eq;
-    use std::rc::Rc;
 
     trait ResetPosition {
         fn reset(&self) -> Self;
@@ -279,7 +277,7 @@ mod tests {
     impl ResetPosition for ExprKind {
         fn reset(&self) -> Self {
             match self {
-                ExprKind::Apply(f, x) => ExprKind::Apply(Rc::new(f.reset()), Rc::new(x.reset())),
+                ExprKind::Apply(f, x) => ExprKind::Apply(Box::new(f.reset()), Box::new(x.reset())),
                 ExprKind::Codata(cs) => ExprKind::Codata(cs.iter().map(|c| c.reset()).collect()),
                 _ => self.clone(),
             }
@@ -369,7 +367,7 @@ mod tests {
 
         let tokens = tokenize(&src).unwrap();
 
-        let parsed = parse(remove_whitespace(&tokens)).map(|x| Rc::new(x.reset()));
+        let parsed = parse(remove_whitespace(&tokens)).map(|x| Box::new(x.reset()));
 
         assert_eq!(parsed.ok(), Some(expr))
     }
