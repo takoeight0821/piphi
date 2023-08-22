@@ -56,6 +56,19 @@ impl Expr {
         }
     }
 
+    pub fn let_(name: &str, value: &Expr, body: &Expr, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Let(
+                Ident {
+                    name: name.to_owned(),
+                },
+                Box::new(value.clone()),
+                Box::new(body.clone()),
+            ),
+            range,
+        }
+    }
+
     pub fn hole(params: Vec<Ident>, range: Range) -> Expr {
         Expr {
             kind: ExprKind::Hole(params),
@@ -84,13 +97,12 @@ impl Expr {
         }
     }
 
-    pub fn let_(name: &str, value: &Expr, body: &Expr, range: Range) -> Expr {
+    pub fn fix(name: &str, body: &Expr, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Let(
+            kind: ExprKind::Fix(
                 Ident {
                     name: name.to_owned(),
                 },
-                Box::new(value.clone()),
                 Box::new(body.clone()),
             ),
             range,
@@ -114,6 +126,8 @@ pub enum ExprKind {
     Case(Vec<Ident>, Vec<(Vec<Pat>, Expr)>),
     // Used for desugaring
     Hole(Vec<Ident>),
+    // Used for desugaring
+    Fix(Ident, Box<Expr>),
 }
 
 impl Display for ExprKind {
@@ -130,6 +144,11 @@ impl Display for ExprKind {
                     write!(f, ", {}", clause)?;
                 }
                 write!(f, " }}")
+            }
+            ExprKind::Let(var, value, body) => {
+                write!(f, "let ")?;
+                write!(f, "{} = {}", var.name, value)?;
+                write!(f, " in {}", body)
             }
             ExprKind::Function(params, body) => {
                 write!(f, "λ(")?;
@@ -180,10 +199,8 @@ impl Display for ExprKind {
                 }
                 write!(f, ")")
             }
-            ExprKind::Let(var, value, body) => {
-                write!(f, "let ")?;
-                write!(f, "{} = {}", var.name, value)?;
-                write!(f, " in {}", body)
+            ExprKind::Fix(name, body) => {
+                write!(f, "(fix {} in {})", name.name, body)
             }
         }
     }

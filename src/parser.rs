@@ -2,7 +2,7 @@ use self::{
     lexer::{Token, TokenKind},
     range::Range,
 };
-use crate::syntax::{Clause, Expr, Ident, Pat};
+use crate::syntax::{Clause, Expr, Pat};
 use anyhow::Result;
 
 pub mod lexer;
@@ -59,12 +59,39 @@ impl Parser {
 
     /// expr ::= let
     fn expr(&mut self) -> Result<Expr> {
-        self.let_()
+        if let Ok(e) = self.let_() {
+            Ok(e)
+        } else {
+            self.fix()
+        }
     }
 
-    /// let ::= 'let' identifier '=' expr 'in' expr | apply
+    fn fix(&mut self) -> Result<Expr> {
+        let range = self.peek().map_or(Default::default(), |token| token.range);
+
+        if !self.match_token(&TokenKind::Ident("fix".to_string())) {
+            return self.atom();
+        }
+        let name = self.identifier().unwrap();
+        if !self.match_token(&TokenKind::Ident("in".to_string())) {
+            return Err(self.expected_error("'in'"));
+        }
+        let body = self.expr().unwrap();
+        Ok(Expr::fix(&name, &body, range))
+    }
+
+    /// let ::= 'fix' identifier 'in' expr | 'let' identifier '=' expr 'in' expr | apply
     fn let_(&mut self) -> Result<Expr> {
         let range = self.peek().map_or(Default::default(), |token| token.range);
+
+        if self.match_token(&TokenKind::Ident("fix".to_string())) {
+            let name = self.identifier().unwrap();
+            if !self.match_token(&TokenKind::Ident("in".to_string())) {
+                return Err(self.expected_error("'in'"));
+            }
+            let body = self.expr().unwrap();
+            return Ok(Expr::fix(&name, &body, range));
+        }
 
         if !self.match_token(&TokenKind::Ident("let".to_string())) {
             return self.apply();
@@ -267,7 +294,7 @@ mod tests {
         parse,
         range::{Position, Range},
     };
-    use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
+    use crate::syntax::{Clause, Expr, ExprKind, Pat, PatKind};
     use pretty_assertions::assert_eq;
 
     trait ResetPosition {
@@ -421,5 +448,13 @@ mod tests {
         let parsed = parse(remove_whitespace(&tokens)).map(|x| Box::new(x.reset()));
 
         assert_eq!(parsed.ok(), Some(Box::new(expr)))
+    }
+
+    #[test]
+    fn parse_fix() {
+        let src = "fix f in { x -> f x }";
+        let tokens = tokenize(src).unwrap();
+        let parsed = parse(remove_whitespace(&tokens)).map(|x| Box::new(x.reset()));
+        assert!(parsed.is_ok_and(|x| matches!(x.kind, ExprKind::Fix(_, _))));
     }
 }
