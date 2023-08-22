@@ -41,6 +41,50 @@ impl Value {
     }
 }
 
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            ValueKind::Number(n) => write!(f, "{}", n),
+            ValueKind::Function(Function {
+                captures,
+                args,
+                body,
+            }) => {
+                write!(
+                    f,
+                    "{{ {} -> {} | {} }}",
+                    args.iter()
+                        .map(|x| x.name.to_owned())
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    body,
+                    captures
+                        .iter()
+                        .map(|(k, v)| format!("{}: {}", k.name, v))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            ValueKind::Object(Object { captures, map }) => {
+                write!(
+                    f,
+                    "{{ {} | {} }}",
+                    map.iter()
+                        .map(|(k, v)| format!("{}: {}", k.name, v))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    captures
+                        .iter()
+                        .map(|(k, v)| format!("{}: {}", k.name, v))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            ValueKind::Accessor(x) => write!(f, "{}", x.name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueKind {
     /// A number
@@ -182,6 +226,9 @@ fn merge_context(left: Expr, right: Expr) -> Expr {
     } else {
         match (left.kind, &right.kind) {
             (ExprKind::Codata(mut left_clauses), ExprKind::Codata(right_clauses)) => {
+                if right_clauses.iter().any(|c| c.always_match()) {
+                    return right;
+                }
                 left_clauses.extend(right_clauses.iter().cloned());
                 Expr::codata(left_clauses, left.range)
             }
@@ -252,7 +299,7 @@ pub fn flatten(expr: &Expr) -> Expr {
                         .iter()
                         .map(|b| format!("{}", b))
                         .collect::<Vec<_>>()
-                        .join(" ")
+                        .join(", ")
                 );
                 debug!("contexts: {}", contexts);
                 (branches, contexts) = pop_last(&branches, &contexts);
@@ -266,6 +313,15 @@ pub fn flatten(expr: &Expr) -> Expr {
             let e2 = flatten(e2);
             Expr::apply(&e1, &e2, expr.range)
         }
+        Let(name, value, body) => {
+            let value = flatten(value);
+            let body = flatten(body);
+            Expr::let_(&name.name, &value, &body, expr.range)
+        }
+        Fix(name, value) => {
+            let value = flatten(value);
+            Expr::fix(&name.name, &value, expr.range)
+        }
         // Function, Object, Case includes Expr, but they are already flattened.
         _ => expr.clone(),
     }
@@ -274,14 +330,27 @@ pub fn flatten(expr: &Expr) -> Expr {
 /// Environment
 type VarEnv = HashMap<Ident, Value>;
 
+fn lookup(env: Rc<VarEnv>, x: &Ident) -> Value {
+    match env.get(x) {
+        // Force a delayed value (used in `fix`)
+        Some(Value {
+            kind:
+                ValueKind::Function(Function {
+                    captures: _,
+                    args,
+                    body,
+                }),
+        }) if args.is_empty() => eval(env.clone(), body),
+        Some(x) => x.clone(),
+        None => panic!("unbound variable: {}", x.name),
+    }
+}
+
 /// Evaluate an expression
 pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
     use ExprKind::*;
     match &expr.kind {
-        Variable(x) => env
-            .get(x)
-            .cloned()
-            .unwrap_or_else(|| panic!("unbound variable: {}", x.name)),
+        Variable(x) => lookup(env, x),
         Label(x) => Value::accessor(x.clone()),
         Number(n) => Value::number(*n),
         Apply(f, x) => {
@@ -302,7 +371,14 @@ pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
                                 map.extend(a.map);
                                 map.extend(b.map);
                             }
-                            _ => panic!("codata must be flattened"),
+                            _ => panic!(
+                                "codata must be flattened: {}",
+                                clauses
+                                    .iter()
+                                    .map(|c| format!("{}", c))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
                         }
                         Value::object(env.clone(), map)
                     });
@@ -314,6 +390,13 @@ pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
             env.insert(name.clone(), value);
             eval(Rc::new(env), body)
         }
+        Fix(name, value) => {
+            let delayed = Value::function(Rc::new(HashMap::new()), vec![], *value.clone());
+            let mut env = (*env).clone();
+            env.insert(name.clone(), delayed);
+            eval(Rc::new(env), value)
+        }
+
         _ => panic!("cannot evaluate: {}", expr),
     }
 }
@@ -395,8 +478,8 @@ fn apply(f: Value, x: Value) -> Value {
                     panic!("no such label: {}", label.name)
                 }
             }
-            _ => panic!("cannot apply accessor to non-object: {:?}", x),
+            _ => panic!("cannot apply accessor to non-object: {}", x),
         },
-        _ => panic!("cannot apply non-function: {:?}", f),
+        _ => panic!("cannot apply non-function: {}", f),
     }
 }

@@ -61,6 +61,22 @@ fn test_let() {
     eval_test("let x = 1 in x", super::Value::number(1));
 }
 
+#[test]
+fn test_fix() {
+    eval_test(
+        ".head (.tail ((fix f in { .head (# n) -> n, .tail (# n) -> f n}) 1))",
+        super::Value::number(1),
+    )
+}
+
+#[test]
+fn test_ones() {
+    eval_test(
+        "let repeat = fix f in { .head (# n) -> n, .tail (# n) -> f n} in .head (.tail (repeat 1))",
+        super::Value::number(1),
+    )
+}
+
 fn eval_test(src: &str, expected: super::Value) {
     init();
     let tokens = tokenize(src).unwrap();

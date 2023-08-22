@@ -224,6 +224,10 @@ impl Clause {
             body: body.clone(),
         }
     }
+
+    pub fn always_match(&self) -> bool {
+        self.pattern.always_match()
+    }
 }
 
 impl Display for Clause {
@@ -287,6 +291,18 @@ impl Pat {
 
     pub fn is_empty(&self) -> bool {
         matches!(self.kind, PatKind::Empty)
+    }
+
+    fn always_match(&self) -> bool {
+        match &self.kind {
+            PatKind::Sequence(ps) => match &ps[..] {
+                [this, args @ ..] => {
+                    this.kind == PatKind::This && args.iter().all(|p| p.kind.is_variable())
+                }
+                _ => false,
+            },
+            _ => false,
+        }
     }
 }
 
