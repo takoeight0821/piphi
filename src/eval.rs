@@ -1,5 +1,6 @@
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
 use log::debug;
+use regex::CaptureNames;
 use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 #[cfg(test)]
@@ -37,6 +38,21 @@ impl Value {
     pub fn accessor(x: Ident) -> Value {
         Value {
             kind: ValueKind::Accessor(x),
+        }
+    }
+
+    pub fn primitive(name: &str) -> Value {
+        Value {
+            kind: ValueKind::Primitive(name.to_owned(), vec![]),
+        }
+    }
+
+    /// Partially apply a primitive function
+    pub fn partial_primitive(name: &str, args: &Vec<Value>, new_args: Vec<Value>) -> Value {
+        let mut args = args.clone();
+        args.extend(new_args);
+        Value {
+            kind: ValueKind::Primitive(name.to_owned(), args),
         }
     }
 }
@@ -81,6 +97,15 @@ impl Display for Value {
                 )
             }
             ValueKind::Accessor(x) => write!(f, "{}", x.name),
+            ValueKind::Primitive(name, args) => write!(
+                f,
+                "{} {}",
+                name,
+                args.iter()
+                    .map(|v| format!("{}", v))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
         }
     }
 }
@@ -96,6 +121,7 @@ pub enum ValueKind {
     Object(Object),
     /// An accessor
     Accessor(Ident),
+    Primitive(String, Vec<Value>),
 }
 
 /// Function
@@ -330,6 +356,12 @@ pub fn flatten(expr: &Expr) -> Expr {
 /// Environment
 type VarEnv = HashMap<Ident, Value>;
 
+pub fn new_env() -> Rc<VarEnv> {
+    let mut env = HashMap::new();
+    env.insert(Ident::new("add"), Value::primitive("add"));
+    Rc::new(env)
+}
+
 fn lookup(env: Rc<VarEnv>, x: &Ident) -> Value {
     match env.get(x) {
         // Force a delayed value (used in `fix`)
@@ -480,6 +512,27 @@ fn apply(f: Value, x: Value) -> Value {
             }
             _ => panic!("cannot apply accessor to non-object: {}", x),
         },
+        Value {
+            kind: ValueKind::Primitive(name, args),
+        } => apply_primitive(name.as_str(), args, x),
         _ => panic!("cannot apply non-function: {}", f),
+    }
+}
+
+fn apply_primitive(name: &str, args: Vec<Value>, x: Value) -> Value {
+    match name {
+        "add" => {
+            if args.is_empty() {
+                Value::partial_primitive(name, &args, vec![x])
+            } else if args.len() == 1 {
+                match (&args[0].kind, &x.kind) {
+                    (ValueKind::Number(a), ValueKind::Number(b)) => Value::number(a + b),
+                    _ => panic!("cannot add: {} {}", args[0], x),
+                }
+            } else {
+                panic!("too many arguments: {}", args.len())
+            }
+        }
+        _ => panic!("unknown primitive: {}", name),
     }
 }

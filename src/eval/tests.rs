@@ -1,5 +1,5 @@
 use crate::{
-    eval::{eval, flatten},
+    eval::{eval, flatten, new_env},
     parser::{
         lexer::{remove_whitespace, tokenize},
         parse,
@@ -77,12 +77,48 @@ fn test_ones() {
     )
 }
 
+#[test]
+fn test_countup() {
+    eval_test(
+        "let countup = fix f in { .head (# n) -> n, .tail (# n) -> f (add n 1)} in .head (.tail (countup 1))",
+        super::Value::number(2),
+    )
+}
+
+#[test]
+fn test_fibo() {
+    eval_test(
+        r#"let zipWith = fix zipWith in {
+              .head (# f xs ys) -> f (.head xs) (.head ys),
+              .tail (# f xs ys) -> zipWith f (.tail xs) (.tail ys)
+            } in
+            let fibo = fix fibo in {
+              .head # -> 1,
+              .head (.tail #) -> 1,
+              .tail (.tail #) -> zipWith add fibo (.tail fibo)
+            } in
+            .head (.tail (.tail fibo))"#,
+        super::Value::number(2),
+    );
+}
+
+#[test]
+fn test_magic_swap() {
+    eval_test(
+        r#"
+        let swap = { # (.fst x) -> .snd x, # (.snd x) -> .fst x } in
+        let x = { .fst # -> 1, .snd # -> 2 } in
+        swap (.snd x)"#,
+        super::Value::number(1),
+    )
+}
+
 fn eval_test(src: &str, expected: super::Value) {
     init();
     let tokens = tokenize(src).unwrap();
     let ast = parse(remove_whitespace(&tokens)).unwrap();
     let ast = flatten(&ast);
     debug!("{}", ast);
-    let value = eval(Rc::new(HashMap::new()), &ast);
+    let value = eval(new_env(), &ast);
     assert_eq!(value, expected);
 }

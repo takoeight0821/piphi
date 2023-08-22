@@ -19,18 +19,14 @@ impl Display for Expr {
 impl Expr {
     pub fn variable(name: &str, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Variable(Ident {
-                name: name.to_string(),
-            }),
+            kind: ExprKind::Variable(Ident::new(name)),
             range,
         }
     }
 
     pub fn label(name: &str, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Label(Ident {
-                name: name.to_string(),
-            }),
+            kind: ExprKind::Label(Ident::new(name)),
             range,
         }
     }
@@ -209,6 +205,14 @@ impl Display for ExprKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ident {
     pub name: String,
+}
+
+impl Ident {
+    pub fn new(arg: &str) -> Ident {
+        Ident {
+            name: arg.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

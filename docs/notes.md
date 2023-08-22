@@ -1,6 +1,7 @@
 ## デザインノート
 
 - ASTはイミュータブル・複製しまくる
+- アイディア元：malgo-lang/malgo (by author), zachsully/dl
 
 ## codataのflatten
 
