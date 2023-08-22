@@ -12,6 +12,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use crate::eval::flatten;
 use crate::eval::Evaluator;
 
 #[derive(Parser)]
@@ -41,7 +42,7 @@ fn main() -> Result<()> {
     println!("{}", ast);
 
     let mut evaluator = Evaluator::new();
-    let ast = evaluator.flatten(&ast);
+    let ast = flatten(&ast);
     let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
 
     println!("{:?}", value);

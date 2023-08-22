@@ -99,7 +99,7 @@ fn build_branch(clause: &Clause) -> Branch {
             let patterns = split_patterns(ps);
             Branch {
                 patterns,
-                body: body.clone(),
+                body: flatten(body),
             }
         }
         _ => panic!("invalid pattern: {}", clause.pattern),
@@ -128,25 +128,6 @@ fn split_patterns(ps: &[Pat]) -> Vec<Pat> {
     patterns
 }
 
-fn fix_pattern_length(branches: Vec<Branch>) -> Vec<Branch> {
-    let mut max_pattern_length = 0;
-    for branch in &branches {
-        max_pattern_length = std::cmp::max(max_pattern_length, branch.patterns.len());
-    }
-    // Fill with Empty pattern from the left
-    branches
-        .into_iter()
-        .map(|mut branch| {
-            let mut patterns = branch.patterns.clone();
-            while patterns.len() < max_pattern_length {
-                patterns.insert(0, Pat::empty());
-            }
-            branch.patterns = patterns;
-            branch
-        })
-        .collect::<Vec<_>>()
-}
-
 fn pop_last(branches: &[Branch], context: &Expr) -> (Vec<Branch>, Expr) {
     let mut new_branches = vec![];
     let mut new_context = Expr::hole(vec![], context.range);
@@ -162,7 +143,7 @@ fn pop_last(branches: &[Branch], context: &Expr) -> (Vec<Branch>, Expr) {
                 .collect::<Vec<_>>()
                 .join(" | ")
         );
-        if rest_patterns.iter().all(|p| p.is_empty()) {
+        if rest_patterns.is_empty() {
             new_context = merge_context(
                 new_context,
                 Expr::codata(vec![Clause::new(last_pattern, &branch.body)], context.range),
@@ -251,6 +232,44 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
     }
 }
 
+/// Preprocess an expression
+pub fn flatten(expr: &Expr) -> Expr {
+    use ExprKind::*;
+
+    match &expr.kind {
+        Codata(clauses) => {
+            let mut branches: Vec<Branch> = clauses.iter().map(build_branch).collect();
+            let mut contexts = Expr {
+                kind: ExprKind::Hole(vec![]),
+                range: expr.range,
+            };
+
+            loop {
+                debug!(
+                    "branches: {}",
+                    branches
+                        .iter()
+                        .map(|b| format!("{}", b))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+                debug!("contexts: {}", contexts);
+                (branches, contexts) = pop_last(&branches, &contexts);
+                if branches.is_empty() {
+                    return contexts;
+                }
+            }
+        }
+        Apply(e1, e2) => {
+            let e1 = flatten(e1);
+            let e2 = flatten(e2);
+            Expr::apply(&e1, &e2, expr.range)
+        }
+        // Function, Object, Case includes Expr, but they are already flattened.
+        _ => expr.clone(),
+    }
+}
+
 /// Environment
 type VarEnv = HashMap<Ident, Value>;
 
@@ -268,45 +287,6 @@ impl Evaluator {
         self.uniq_supply += 1;
         Ident {
             name: format!("#{}_{}", hint, uniq),
-        }
-    }
-
-    /// Preprocess an expression
-    pub fn flatten(&mut self, expr: &Expr) -> Expr {
-        use ExprKind::*;
-
-        match &expr.kind {
-            Codata(clauses) => {
-                let branches: Vec<Branch> = clauses.iter().map(build_branch).collect();
-                let mut branches = fix_pattern_length(branches);
-                let mut contexts = Expr {
-                    kind: ExprKind::Hole(vec![]),
-                    range: expr.range,
-                };
-
-                loop {
-                    debug!(
-                        "branches: {}\ncontexts: {}",
-                        branches
-                            .iter()
-                            .map(|b| format!("{}", b))
-                            .collect::<Vec<_>>()
-                            .join(" "),
-                        &contexts
-                    );
-                    (branches, contexts) = pop_last(&branches, &contexts);
-                    if branches.is_empty() {
-                        return contexts;
-                    }
-                }
-            }
-            Apply(e1, e2) => {
-                let e1 = self.flatten(e1);
-                let e2 = self.flatten(e2);
-                Expr::apply(&e1, &e2, expr.range)
-            }
-            // Function, Object, Case includes Expr, but they are already flattened.
-            _ => expr.clone(),
         }
     }
 
@@ -436,9 +416,12 @@ impl Evaluator {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{
-        lexer::{remove_whitespace, tokenize},
-        parse,
+    use crate::{
+        eval::flatten,
+        parser::{
+            lexer::{remove_whitespace, tokenize},
+            parse,
+        },
     };
     use log::debug;
     use std::{collections::HashMap, rc::Rc};
@@ -471,6 +454,14 @@ mod tests {
     }
 
     #[test]
+    fn test_flattened2() {
+        eval_test(
+            ".get ({ # x -> { .get (# y) -> x } } 1 2)",
+            super::Value::number(1),
+        );
+    }
+
+    #[test]
     fn test_complex() {
         eval_test(".get ({ .get (# x y) -> x } 1 2)", super::Value::number(1));
     }
@@ -488,7 +479,7 @@ mod tests {
         let tokens = tokenize(src).unwrap();
         let ast = parse(remove_whitespace(&tokens)).unwrap();
         let mut evaluator = super::Evaluator::new();
-        let ast = evaluator.flatten(&ast);
+        let ast = flatten(&ast);
         debug!("{}", ast);
         let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
         assert_eq!(value, expected);
