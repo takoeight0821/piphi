@@ -1,3 +1,5 @@
+use log::debug;
+
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
 use std::{collections::HashMap, fmt::Display, rc::Rc};
 
@@ -151,8 +153,8 @@ fn pop_last(branches: &[Branch], context: &Expr) -> (Vec<Branch>, Expr) {
     for branch in branches {
         let last_pattern = branch.patterns.last().unwrap();
         let rest_patterns = &branch.patterns[..branch.patterns.len() - 1];
-        println!("last: {}", last_pattern);
-        println!(
+        debug!("last: {}", last_pattern);
+        debug!(
             "rest: {}",
             rest_patterns
                 .iter()
@@ -245,7 +247,7 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
                 .collect();
             Expr::let_(ds, &apply_context(body, arg), context.range)
         }
-        _ => panic!("cannot apply context: {}", context),
+        _ => context.clone(),
     }
 }
 
@@ -283,7 +285,7 @@ impl Evaluator {
                 };
 
                 loop {
-                    println!(
+                    debug!(
                         "branches: {}\ncontexts: {}",
                         branches
                             .iter()
@@ -438,61 +440,57 @@ mod tests {
         lexer::{remove_whitespace, tokenize},
         parse,
     };
+    use log::debug;
     use std::{collections::HashMap, rc::Rc};
+
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
 
     #[test]
     fn test_simple() {
-        let src = "{ # x -> x } 1";
-        let tokens = tokenize(src).unwrap();
-        let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let mut evaluator = super::Evaluator::new();
-        let ast = evaluator.flatten(&ast);
-        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, super::Value::number(1));
+        eval_test("{ # x -> x } 1", super::Value::number(1));
     }
 
     #[test]
     fn test_record() {
-        let src = ".get { .get # -> 1 }";
-        let tokens = tokenize(src).unwrap();
-        let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let mut evaluator = super::Evaluator::new();
-        let ast = evaluator.flatten(&ast);
-        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, super::Value::number(1));
+        eval_test(".get { .get # -> 1 }", super::Value::number(1));
     }
 
     #[test]
     fn test_multi_args() {
-        let src = "{ # x y -> x } 1 2";
-        let tokens = tokenize(src).unwrap();
-        let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let mut evaluator = super::Evaluator::new();
-        let ast = evaluator.flatten(&ast);
-        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, super::Value::number(1));
+        eval_test("{ # x y -> y } 1 2", super::Value::number(2));
     }
 
     #[test]
     fn test_flattened() {
-        let src = ".get ({ # x y -> { .get # -> x } } 1 2)";
-        let tokens = tokenize(src).unwrap();
-        let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let mut evaluator = super::Evaluator::new();
-        let ast = evaluator.flatten(&ast);
-        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, super::Value::number(1));
+        eval_test(
+            ".get ({ # x y -> { .get # -> x } } 1 2)",
+            super::Value::number(1),
+        );
     }
 
     #[test]
     fn test_complex() {
-        let src = ".get ({ .get (# x y) -> x } 1 2)";
+        eval_test(".get ({ .get (# x y) -> x } 1 2)", super::Value::number(1));
+    }
+
+    #[test]
+    fn test_nest_field() {
+        eval_test(
+            ".head (.tail { .head # -> 1, .head (.tail #) -> 2 })",
+            super::Value::number(2),
+        );
+    }
+
+    fn eval_test(src: &str, expected: super::Value) {
+        init();
         let tokens = tokenize(src).unwrap();
         let ast = parse(remove_whitespace(&tokens)).unwrap();
         let mut evaluator = super::Evaluator::new();
         let ast = evaluator.flatten(&ast);
-        println!("{}", ast);
+        debug!("{}", ast);
         let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, super::Value::number(1));
+        assert_eq!(value, expected);
     }
 }
