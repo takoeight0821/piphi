@@ -273,45 +273,27 @@ pub fn flatten(expr: &Expr) -> Expr {
 /// Environment
 type VarEnv = HashMap<Ident, Value>;
 
-pub struct Evaluator {
-    uniq_supply: i64,
-}
-
-impl Evaluator {
-    pub fn new() -> Evaluator {
-        Evaluator { uniq_supply: 0 }
-    }
-
-    pub fn gensym(&mut self, hint: &str) -> Ident {
-        let uniq = self.uniq_supply;
-        self.uniq_supply += 1;
-        Ident {
-            name: format!("#{}_{}", hint, uniq),
+/// Evaluate an expression
+pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
+    use ExprKind::*;
+    match &expr.kind {
+        Variable(x) => env
+            .get(x)
+            .cloned()
+            .unwrap_or_else(|| panic!("unbound variable: {}", x.name)),
+        Label(x) => Value::accessor(x.clone()),
+        Number(n) => Value::number(*n),
+        Apply(f, x) => {
+            let f = eval(env.clone(), f);
+            let x = eval(env.clone(), x);
+            apply(f, x)
         }
-    }
-
-    /// Evaluate an expression
-    pub fn eval(&mut self, env: Rc<VarEnv>, expr: &Expr) -> Value {
-        use ExprKind::*;
-        match &expr.kind {
-            Variable(x) => env
-                .get(x)
-                .cloned()
-                .unwrap_or_else(|| panic!("unbound variable: {}", x.name)),
-            Label(x) => Value::accessor(x.clone()),
-            Number(n) => Value::number(*n),
-            Apply(f, x) => {
-                let f = self.eval(env.clone(), f);
-                let x = self.eval(env.clone(), x);
-                self.apply(f, x)
-            }
-            Codata(clauses) if clauses.len() == 1 => {
-                self.eval_clause(env, clauses.first().unwrap())
-            }
-            Codata(clauses) => {
-                let object: Option<Value> = clauses
+        Codata(clauses) if clauses.len() == 1 => eval_clause(env, clauses.first().unwrap()),
+        Codata(clauses) => {
+            let object: Option<Value> =
+                clauses
                     .iter()
-                    .map(|c| self.eval_clause(env.clone(), c))
+                    .map(|c| eval_clause(env.clone(), c))
                     .reduce(|a, b| {
                         let mut map = HashMap::new();
                         match (a.kind, b.kind) {
@@ -323,101 +305,99 @@ impl Evaluator {
                         }
                         Value::object(env.clone(), map)
                     });
-                object.unwrap()
-            }
-            _ => panic!("cannot evaluate: {}", expr),
+            object.unwrap()
         }
+        _ => panic!("cannot evaluate: {}", expr),
     }
+}
 
-    /// Turn a clause into a function.
-    /// Restriction: the clause must have a sequence of patterns that start with a `#` and other patterns must be variables.
-    fn eval_clause(&self, env: Rc<VarEnv>, clause: &Clause) -> Value {
-        match clause {
-            Clause {
-                pattern:
-                    Pat {
-                        kind: PatKind::Sequence(ps),
-                        ..
-                    },
-                body,
-            } => {
-                match &ps[..] {
-                    [this, ref args @ ..]
-                        if this.kind == PatKind::This
-                            && args.iter().all(|p| p.kind.is_variable()) =>
-                    {
-                        // Function
-                        fn get_name(p: &Pat) -> Ident {
-                            match &p.kind {
-                                PatKind::Variable(x) => x.clone(),
-                                _ => unreachable!(),
-                            }
+/// Turn a clause into a function.
+/// Restriction: the clause must have a sequence of patterns that start with a `#` and other patterns must be variables.
+fn eval_clause(env: Rc<VarEnv>, clause: &Clause) -> Value {
+    match clause {
+        Clause {
+            pattern:
+                Pat {
+                    kind: PatKind::Sequence(ps),
+                    ..
+                },
+            body,
+        } => {
+            match &ps[..] {
+                [this, ref args @ ..]
+                    if this.kind == PatKind::This && args.iter().all(|p| p.kind.is_variable()) =>
+                {
+                    // Function
+                    fn get_name(p: &Pat) -> Ident {
+                        match &p.kind {
+                            PatKind::Variable(x) => x.clone(),
+                            _ => unreachable!(),
                         }
+                    }
 
-                        let args = args.iter().map(get_name).collect();
-                        Value::function(env.clone(), args, body.clone())
-                    }
-                    [Pat {
-                        kind: PatKind::Label(label),
-                        ..
-                    }, Pat {
-                        kind: PatKind::This,
-                        ..
-                    }] => {
-                        let mut map = HashMap::new();
-                        map.insert(label.clone(), body.clone());
-                        Value::object(env.clone(), map)
-                    }
-                    _ => panic!("nested pattern: {}", clause.pattern),
+                    let args = args.iter().map(get_name).collect();
+                    Value::function(env.clone(), args, body.clone())
                 }
+                [Pat {
+                    kind: PatKind::Label(label),
+                    ..
+                }, Pat {
+                    kind: PatKind::This,
+                    ..
+                }] => {
+                    let mut map = HashMap::new();
+                    map.insert(label.clone(), body.clone());
+                    Value::object(env.clone(), map)
+                }
+                _ => panic!("nested pattern: {}", clause.pattern),
             }
-            _ => panic!("invalid pattern: {}", clause.pattern),
         }
+        _ => panic!("invalid pattern: {}", clause.pattern),
     }
+}
 
-    fn apply(&mut self, f: Value, x: Value) -> Value {
-        match f {
+fn apply(f: Value, x: Value) -> Value {
+    match f {
+        Value {
+            kind:
+                ValueKind::Function(Function {
+                    captures,
+                    args,
+                    body,
+                }),
+        } => {
+            if args.len() == 1 {
+                let mut env = (*captures).clone();
+                env.insert(args[0].clone(), x);
+                eval(Rc::new(env), &body)
+            } else {
+                let mut env = (*captures).clone();
+                env.insert(args[0].clone(), x);
+                Value::function(Rc::new(env), args[1..].to_vec(), body)
+            }
+        }
+        Value {
+            kind: ValueKind::Accessor(label),
+        } => match x {
             Value {
-                kind:
-                    ValueKind::Function(Function {
-                        captures,
-                        args,
-                        body,
-                    }),
+                kind: ValueKind::Object(Object { captures, map }),
             } => {
-                if args.len() == 1 {
-                    let mut env = (*captures).clone();
-                    env.insert(args[0].clone(), x);
-                    self.eval(Rc::new(env), &body)
+                if let Some(body) = map.get(&label) {
+                    eval(captures, body)
                 } else {
-                    let mut env = (*captures).clone();
-                    env.insert(args[0].clone(), x);
-                    Value::function(Rc::new(env), args[1..].to_vec(), body)
+                    panic!("no such label: {}", label.name)
                 }
             }
-            Value {
-                kind: ValueKind::Accessor(label),
-            } => match x {
-                Value {
-                    kind: ValueKind::Object(Object { captures, map }),
-                } => {
-                    if let Some(body) = map.get(&label) {
-                        self.eval(captures, body)
-                    } else {
-                        panic!("no such label: {}", label.name)
-                    }
-                }
-                _ => panic!("cannot apply accessor to non-object: {:?}", x),
-            },
-            _ => panic!("cannot apply non-function: {:?}", f),
-        }
+            _ => panic!("cannot apply accessor to non-object: {:?}", x),
+        },
+        _ => panic!("cannot apply non-function: {:?}", f),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        eval::flatten,
+        eval::{eval, flatten},
         parser::{
             lexer::{remove_whitespace, tokenize},
             parse,
@@ -478,10 +458,9 @@ mod tests {
         init();
         let tokens = tokenize(src).unwrap();
         let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let mut evaluator = super::Evaluator::new();
         let ast = flatten(&ast);
         debug!("{}", ast);
-        let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+        let value = eval(Rc::new(HashMap::new()), &ast);
         assert_eq!(value, expected);
     }
 }

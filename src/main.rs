@@ -4,16 +4,12 @@ mod syntax;
 
 use anyhow::Result;
 use clap::Parser;
-use parser::lexer::remove_whitespace;
-use parser::lexer::tokenize;
-use parser::parse;
-use std::collections::HashMap;
-use std::io::Read;
-use std::path::PathBuf;
-use std::rc::Rc;
-
-use crate::eval::flatten;
-use crate::eval::Evaluator;
+use eval::{eval, flatten};
+use parser::{
+    lexer::{remove_whitespace, tokenize},
+    parse,
+};
+use std::{collections::HashMap, io::Read, path::PathBuf, rc::Rc};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -41,9 +37,8 @@ fn main() -> Result<()> {
 
     println!("{}", ast);
 
-    let mut evaluator = Evaluator::new();
     let ast = flatten(&ast);
-    let value = evaluator.eval(Rc::new(HashMap::new()), &ast);
+    let value = eval(Rc::new(HashMap::new()), &ast);
 
     println!("{:?}", value);
 
