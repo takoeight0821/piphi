@@ -1,7 +1,9 @@
-use log::debug;
-
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
+use log::debug;
 use std::{collections::HashMap, fmt::Display, rc::Rc};
+
+#[cfg(test)]
+mod tests;
 
 /// Value
 #[derive(Debug, Clone, PartialEq)]
@@ -221,13 +223,12 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
                 .collect();
             Expr::case(ss.clone(), branches, context.range)
         }
-        ExprKind::Let(ds, body) => {
-            let ds = ds
-                .iter()
-                .map(|(x, e)| (x.clone(), apply_context(e, arg)))
-                .collect();
-            Expr::let_(ds, &apply_context(body, arg), context.range)
-        }
+        ExprKind::Let(var, value, body) => Expr::let_(
+            var.clone(),
+            &apply_context(value, arg),
+            &apply_context(body, arg),
+            context.range,
+        ),
         _ => context.clone(),
     }
 }
@@ -391,76 +392,5 @@ fn apply(f: Value, x: Value) -> Value {
             _ => panic!("cannot apply accessor to non-object: {:?}", x),
         },
         _ => panic!("cannot apply non-function: {:?}", f),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{
-        eval::{eval, flatten},
-        parser::{
-            lexer::{remove_whitespace, tokenize},
-            parse,
-        },
-    };
-    use log::debug;
-    use std::{collections::HashMap, rc::Rc};
-
-    fn init() {
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
-
-    #[test]
-    fn test_simple() {
-        eval_test("{ # x -> x } 1", super::Value::number(1));
-    }
-
-    #[test]
-    fn test_record() {
-        eval_test(".get { .get # -> 1 }", super::Value::number(1));
-    }
-
-    #[test]
-    fn test_multi_args() {
-        eval_test("{ # x y -> y } 1 2", super::Value::number(2));
-    }
-
-    #[test]
-    fn test_flattened() {
-        eval_test(
-            ".get ({ # x y -> { .get # -> x } } 1 2)",
-            super::Value::number(1),
-        );
-    }
-
-    #[test]
-    fn test_flattened2() {
-        eval_test(
-            ".get ({ # x -> { .get (# y) -> x } } 1 2)",
-            super::Value::number(1),
-        );
-    }
-
-    #[test]
-    fn test_complex() {
-        eval_test(".get ({ .get (# x y) -> x } 1 2)", super::Value::number(1));
-    }
-
-    #[test]
-    fn test_nest_field() {
-        eval_test(
-            ".head (.tail { .head # -> 1, .head (.tail #) -> 2 })",
-            super::Value::number(2),
-        );
-    }
-
-    fn eval_test(src: &str, expected: super::Value) {
-        init();
-        let tokens = tokenize(src).unwrap();
-        let ast = parse(remove_whitespace(&tokens)).unwrap();
-        let ast = flatten(&ast);
-        debug!("{}", ast);
-        let value = eval(Rc::new(HashMap::new()), &ast);
-        assert_eq!(value, expected);
     }
 }

@@ -207,6 +207,11 @@ impl Parser {
         }
     }
 
+    fn is_keyword(name: &str) -> bool {
+        const KEYWORDS: [&str; 2] = ["let", "in"];
+        KEYWORDS.contains(&name)
+    }
+
     fn identifier(&mut self) -> Result<String> {
         let ident = match self.peek() {
             Some(Token {
@@ -215,8 +220,12 @@ impl Parser {
             }) => Ok(ident.clone()),
             _ => Err(self.expected_error("identifier")),
         }?;
-        self.consume();
-        Ok(ident)
+        if Self::is_keyword(&ident) {
+            Err(self.expected_error("identifier"))
+        } else {
+            self.consume();
+            Ok(ident)
+        }
     }
 
     fn number(&mut self) -> Result<i64> {
@@ -239,7 +248,7 @@ mod tests {
         parse,
         range::{Position, Range},
     };
-    use crate::syntax::{Clause, Expr, ExprKind, Pat, PatKind};
+    use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
     use pretty_assertions::assert_eq;
 
     trait ResetPosition {
@@ -362,6 +371,26 @@ mod tests {
         );
         let left = Expr::label("get", Default::default());
         let expr = Expr::apply(&left, &right, Default::default());
+
+        let src = format!("{}", expr);
+
+        let tokens = tokenize(&src).unwrap();
+
+        let parsed = parse(remove_whitespace(&tokens)).map(|x| Box::new(x.reset()));
+
+        assert_eq!(parsed.ok(), Some(Box::new(expr)))
+    }
+
+    #[test]
+    fn parse_let() {
+        let expr = Expr::let_(
+            Ident {
+                name: "x".to_owned(),
+            },
+            &Expr::number(1, Default::default()),
+            &Expr::variable("x", Default::default()),
+            Default::default(),
+        );
 
         let src = format!("{}", expr);
 

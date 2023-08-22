@@ -84,9 +84,9 @@ impl Expr {
         }
     }
 
-    pub fn let_(ds: Vec<(Ident, Expr)>, arg: &Expr, range: Range) -> Expr {
+    pub fn let_(var: Ident, value: &Expr, body: &Expr, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Let(ds, Box::new(arg.clone())),
+            kind: ExprKind::Let(var, Box::new(value.clone()), Box::new(body.clone())),
             range,
         }
     }
@@ -99,13 +99,15 @@ pub enum ExprKind {
     Number(i64),
     Apply(Box<Expr>, Box<Expr>),
     Codata(Vec<Clause>),
+    Let(Ident, Box<Expr>, Box<Expr>),
     // Used for desugaring
     Function(Vec<Ident>, Box<Expr>),
     // Used for desugaring
     Object(HashMap<Ident, Expr>),
+    // Used for desugaring
     Case(Vec<Ident>, Vec<(Vec<Pat>, Expr)>),
+    // Used for desugaring
     Hole(Vec<Ident>),
-    Let(Vec<(Ident, Expr)>, Box<Expr>),
 }
 
 impl Display for ExprKind {
@@ -172,13 +174,9 @@ impl Display for ExprKind {
                 }
                 write!(f, ")")
             }
-            ExprKind::Let(binds, body) => {
+            ExprKind::Let(var, value, body) => {
                 write!(f, "let ")?;
-                let (first_ident, first_expr) = binds.iter().next().unwrap();
-                write!(f, "{} = {}", first_ident.name, first_expr)?;
-                for (ident, expr) in binds.iter().skip(1) {
-                    write!(f, ", {} = {}", ident.name, expr)?;
-                }
+                write!(f, "{} = {}", var.name, value)?;
                 write!(f, " in {}", body)
             }
         }
