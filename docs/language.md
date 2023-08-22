@@ -101,7 +101,7 @@ codata Stream = {
 ```
 def iota = {
   .head (# n) -> n,
-  .tail (# n)-> iota (add n 1),
+  .tail (# n) -> iota (add n 1),
 }
 ```
 

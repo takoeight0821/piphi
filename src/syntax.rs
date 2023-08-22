@@ -1,4 +1,5 @@
 use crate::parser::range::Range;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -54,6 +55,41 @@ impl Expr {
             range,
         }
     }
+
+    pub fn hole(params: Vec<Ident>, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Hole(params),
+            range,
+        }
+    }
+
+    pub fn function(params: Vec<Ident>, arg: &Expr, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Function(params, Box::new(arg.clone())),
+            range,
+        }
+    }
+
+    pub fn object(map: HashMap<Ident, Expr>, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Object(map),
+            range,
+        }
+    }
+
+    pub fn case(ss: Vec<Ident>, branches: Vec<(Vec<Pat>, Expr)>, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Case(ss, branches),
+            range,
+        }
+    }
+
+    pub fn let_(ds: Vec<(Ident, Expr)>, arg: &Expr, range: Range) -> Expr {
+        Expr {
+            kind: ExprKind::Let(ds, Box::new(arg.clone())),
+            range,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +99,13 @@ pub enum ExprKind {
     Number(i64),
     Apply(Box<Expr>, Box<Expr>),
     Codata(Vec<Clause>),
+    // Used for desugaring
+    Function(Vec<Ident>, Box<Expr>),
+    // Used for desugaring
+    Object(HashMap<Ident, Expr>),
+    Case(Vec<Ident>, Vec<(Vec<Pat>, Expr)>),
+    Hole(Vec<Ident>),
+    Let(Vec<(Ident, Expr)>, Box<Expr>),
 }
 
 impl Display for ExprKind {
@@ -79,6 +122,64 @@ impl Display for ExprKind {
                     write!(f, ", {}", clause)?;
                 }
                 write!(f, " }}")
+            }
+            ExprKind::Function(params, body) => {
+                write!(f, "λ(")?;
+                write!(f, "{}", params[0].name)?;
+                for param in params[1..].iter() {
+                    write!(f, " {}", param.name)?;
+                }
+                write!(f, ").({})", body)
+            }
+            ExprKind::Object(map) => {
+                write!(f, "{{ ")?;
+                let (first_key, first_value) = map.iter().next().unwrap();
+                write!(f, ".{}: {}", first_key.name, first_value)?;
+                for (key, value) in map.iter().skip(1) {
+                    write!(f, ", .{}: {}", key.name, value)?;
+                }
+                write!(f, " }}")
+            }
+            ExprKind::Case(ss, clauses) => {
+                write!(f, "case ")?;
+                write!(f, "{}", ss[0].name)?;
+                for s in ss[1..].iter() {
+                    write!(f, " {}", s.name)?;
+                }
+                write!(f, " {{ ")?;
+                let (first_patterns, first_body) = clauses.iter().next().unwrap();
+                for pattern in first_patterns.iter() {
+                    write!(f, "{} ", pattern)?;
+                }
+                write!(f, "-> {}", first_body)?;
+
+                for (patterns, body) in clauses.iter().skip(1) {
+                    write!(f, ", ")?;
+                    for pattern in patterns.iter() {
+                        write!(f, "{} ", pattern)?;
+                    }
+                    write!(f, "-> {}", body)?;
+                }
+                write!(f, " }}")
+            }
+            ExprKind::Hole(args) => {
+                write!(f, "([.]")?;
+                if !args.is_empty() {
+                    write!(f, "{}", args[0].name)?;
+                    for arg in args[1..].iter() {
+                        write!(f, " {}", arg.name)?;
+                    }
+                }
+                write!(f, ")")
+            }
+            ExprKind::Let(binds, body) => {
+                write!(f, "let ")?;
+                let (first_ident, first_expr) = binds.iter().next().unwrap();
+                write!(f, "{} = {}", first_ident.name, first_expr)?;
+                for (ident, expr) in binds.iter().skip(1) {
+                    write!(f, ", {} = {}", ident.name, expr)?;
+                }
+                write!(f, " in {}", body)
             }
         }
     }
@@ -155,6 +256,17 @@ impl Pat {
             range,
         }
     }
+
+    pub fn empty() -> Pat {
+        Pat {
+            kind: PatKind::Empty,
+            range: Default::default(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self.kind, PatKind::Empty)
+    }
 }
 
 impl Display for Pat {
@@ -170,6 +282,7 @@ pub enum PatKind {
     Variable(Ident),
     Label(Ident),
     Number(i64),
+    Empty,
 }
 
 impl Display for PatKind {
@@ -188,6 +301,7 @@ impl Display for PatKind {
             PatKind::Variable(ident) => write!(f, "{}", ident.name),
             PatKind::Label(ident) => write!(f, ".{}", ident.name),
             PatKind::Number(n) => write!(f, "{}", n),
+            PatKind::Empty => write!(f, "_"),
         }
     }
 }
