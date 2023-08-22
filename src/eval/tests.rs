@@ -56,6 +56,11 @@ fn test_nest_field() {
     );
 }
 
+#[test]
+fn test_let() {
+    eval_test("let x = 1 in x", super::Value::number(1));
+}
+
 fn eval_test(src: &str, expected: super::Value) {
     init();
     let tokens = tokenize(src).unwrap();

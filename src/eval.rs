@@ -224,7 +224,7 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
             Expr::case(ss.clone(), branches, context.range)
         }
         ExprKind::Let(var, value, body) => Expr::let_(
-            var.clone(),
+            &var.name,
             &apply_context(value, arg),
             &apply_context(body, arg),
             context.range,
@@ -307,6 +307,12 @@ pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
                         Value::object(env.clone(), map)
                     });
             object.unwrap()
+        }
+        Let(name, value, body) => {
+            let value = eval(env.clone(), value);
+            let mut env = (*env).clone();
+            env.insert(name.clone(), value);
+            eval(Rc::new(env), body)
         }
         _ => panic!("cannot evaluate: {}", expr),
     }

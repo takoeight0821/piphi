@@ -2,7 +2,7 @@ use self::{
     lexer::{Token, TokenKind},
     range::Range,
 };
-use crate::syntax::{Clause, Expr, Pat};
+use crate::syntax::{Clause, Expr, Ident, Pat};
 use anyhow::Result;
 
 pub mod lexer;
@@ -57,9 +57,28 @@ impl Parser {
         }
     }
 
-    /// expr ::= apply
+    /// expr ::= let
     fn expr(&mut self) -> Result<Expr> {
-        self.apply()
+        self.let_()
+    }
+
+    /// let ::= 'let' identifier '=' expr 'in' expr | apply
+    fn let_(&mut self) -> Result<Expr> {
+        let range = self.peek().map_or(Default::default(), |token| token.range);
+
+        if !self.match_token(&TokenKind::Ident("let".to_string())) {
+            return self.apply();
+        }
+        let name = self.identifier()?;
+        if !self.match_token(&TokenKind::Symbol("=".to_string())) {
+            return Err(self.expected_error("'='"));
+        }
+        let value = self.expr()?;
+        if !self.match_token(&TokenKind::Ident("in".to_string())) {
+            return Err(self.expected_error("'in'"));
+        }
+        let body = self.expr()?;
+        Ok(Expr::let_(&name, &value, &body, range))
     }
 
     /// apply ::= term (term)*
@@ -288,6 +307,11 @@ mod tests {
             match self {
                 ExprKind::Apply(f, x) => ExprKind::Apply(Box::new(f.reset()), Box::new(x.reset())),
                 ExprKind::Codata(cs) => ExprKind::Codata(cs.iter().map(|c| c.reset()).collect()),
+                ExprKind::Let(name, value, body) => ExprKind::Let(
+                    name.clone(),
+                    Box::new(value.reset()),
+                    Box::new(body.reset()),
+                ),
                 _ => self.clone(),
             }
         }
@@ -384,9 +408,7 @@ mod tests {
     #[test]
     fn parse_let() {
         let expr = Expr::let_(
-            Ident {
-                name: "x".to_owned(),
-            },
+            "x",
             &Expr::number(1, Default::default()),
             &Expr::variable("x", Default::default()),
             Default::default(),

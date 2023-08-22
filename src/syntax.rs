@@ -84,9 +84,15 @@ impl Expr {
         }
     }
 
-    pub fn let_(var: Ident, value: &Expr, body: &Expr, range: Range) -> Expr {
+    pub fn let_(name: &str, value: &Expr, body: &Expr, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Let(var, Box::new(value.clone()), Box::new(body.clone())),
+            kind: ExprKind::Let(
+                Ident {
+                    name: name.to_owned(),
+                },
+                Box::new(value.clone()),
+                Box::new(body.clone()),
+            ),
             range,
         }
     }
