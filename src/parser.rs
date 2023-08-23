@@ -226,7 +226,7 @@ impl Parser {
                 start: pats.first().unwrap().range.start,
                 end: pats.last().unwrap().range.end,
             };
-            Ok(Pat::sequence(pats, range))
+            Ok(Pat::sequence(&pats, range))
         }
     }
 

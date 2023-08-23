@@ -1,6 +1,5 @@
 use crate::syntax::{Clause, Expr, ExprKind, Ident, Pat, PatKind};
 use log::debug;
-use regex::CaptureNames;
 use std::{collections::HashMap, fmt::Display, rc::Rc};
 
 #[cfg(test)]
@@ -48,8 +47,8 @@ impl Value {
     }
 
     /// Partially apply a primitive function
-    pub fn partial_primitive(name: &str, args: &Vec<Value>, new_args: Vec<Value>) -> Value {
-        let mut args = args.clone();
+    pub fn partial_primitive(name: &str, args: &[Value], new_args: Vec<Value>) -> Value {
+        let mut args = args.to_vec();
         args.extend(new_args);
         Value {
             kind: ValueKind::Primitive(name.to_owned(), args),
@@ -158,7 +157,7 @@ impl Display for Branch {
     }
 }
 
-fn build_branch(clause: &Clause) -> Branch {
+fn build_branch(clause: Clause) -> Branch {
     match clause {
         Clause {
             pattern:
@@ -178,24 +177,25 @@ fn build_branch(clause: &Clause) -> Branch {
     }
 }
 
-fn split_patterns(ps: &[Pat]) -> Vec<Pat> {
+fn split_patterns(ps: Vec<Pat>) -> Vec<Pat> {
     let mut patterns = vec![];
     let mut current = vec![];
-    for p in ps {
-        match &p.kind {
+    let mut ps = ps.into_iter().peekable();
+    while let Some(p) = ps.next() {
+        match p.kind {
             PatKind::Sequence(ps2) => {
                 if !current.is_empty() {
                     current.push(Pat::this(p.range));
-                    patterns.push(Pat::sequence(current, p.range));
+                    patterns.push(Pat::sequence(&current, p.range));
                     current = vec![];
                 }
                 patterns.extend(split_patterns(ps2));
             }
             _ => current.push(p.clone()),
         }
-    }
-    if !current.is_empty() {
-        patterns.push(Pat::sequence(current, ps.last().unwrap().range));
+        if ps.peek().is_none() && !current.is_empty() {
+            patterns.push(Pat::sequence(&current, p.range));
+        }
     }
     patterns
 }
@@ -307,12 +307,12 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
 }
 
 /// Preprocess an expression
-pub fn flatten(expr: &Expr) -> Expr {
+pub fn flatten(expr: Expr) -> Expr {
     use ExprKind::*;
 
-    match &expr.kind {
+    match expr.kind {
         Codata(clauses) => {
-            let mut branches: Vec<Branch> = clauses.iter().map(build_branch).collect();
+            let mut branches: Vec<Branch> = clauses.into_iter().map(build_branch).collect();
             let mut contexts = Expr {
                 kind: ExprKind::Hole(vec![]),
                 range: expr.range,
@@ -335,17 +335,17 @@ pub fn flatten(expr: &Expr) -> Expr {
             }
         }
         Apply(e1, e2) => {
-            let e1 = flatten(e1);
-            let e2 = flatten(e2);
+            let e1 = flatten(*e1);
+            let e2 = flatten(*e2);
             Expr::apply(&e1, &e2, expr.range)
         }
         Let(name, value, body) => {
-            let value = flatten(value);
-            let body = flatten(body);
+            let value = flatten(*value);
+            let body = flatten(*body);
             Expr::let_(&name.name, &value, &body, expr.range)
         }
         Fix(name, value) => {
-            let value = flatten(value);
+            let value = flatten(*value);
             Expr::fix(&name.name, &value, expr.range)
         }
         // Function, Object, Case includes Expr, but they are already flattened.

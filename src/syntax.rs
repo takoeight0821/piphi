@@ -247,9 +247,9 @@ pub struct Pat {
 }
 
 impl Pat {
-    pub fn sequence(patterns: Vec<Pat>, range: Range) -> Pat {
+    pub fn sequence(patterns: &[Pat], range: Range) -> Pat {
         Pat {
-            kind: PatKind::Sequence(patterns),
+            kind: PatKind::Sequence(patterns.to_owned()),
             range,
         }
     }

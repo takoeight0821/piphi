@@ -86,10 +86,10 @@ fn parse_test() {
         vec![
             Clause::new(
                 &Pat::sequence(
-                    vec![
+                    &vec![
                         Pat::label("get", Default::default()),
                         Pat::sequence(
-                            vec![
+                            &vec![
                                 Pat::this(Default::default()),
                                 Pat::variable("x", Default::default()),
                             ],
@@ -102,10 +102,10 @@ fn parse_test() {
             ),
             Clause::new(
                 &Pat::sequence(
-                    vec![
+                    &vec![
                         Pat::label("set", Default::default()),
                         Pat::sequence(
-                            vec![
+                            &vec![
                                 Pat::this(Default::default()),
                                 Pat::variable("p", Default::default()),
                             ],

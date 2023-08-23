@@ -9,7 +9,7 @@ use parser::{
     lexer::{remove_whitespace, tokenize},
     parse,
 };
-use std::{collections::HashMap, io::Read, path::PathBuf, rc::Rc};
+use std::{io::Read, path::PathBuf};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -37,8 +37,8 @@ fn main() -> Result<()> {
 
     println!("{}", ast);
 
-    let ast = flatten(&ast);
-    let value = eval(Rc::new(HashMap::new()), &ast);
+    let ast = flatten(ast);
+    let value = eval(eval::new_env(), &ast);
 
     println!("{:?}", value);
 

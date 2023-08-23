@@ -116,7 +116,7 @@ fn eval_test(src: &str, expected: super::Value) {
     init();
     let tokens = tokenize(src).unwrap();
     let ast = parse(remove_whitespace(&tokens)).unwrap();
-    let ast = flatten(&ast);
+    let ast = flatten(ast);
     debug!("{}", ast);
     let value = eval(new_env(), &ast);
     assert_eq!(value, expected);
