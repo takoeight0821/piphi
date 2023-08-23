@@ -365,8 +365,8 @@ pub fn new_env() -> Rc<VarEnv> {
     Rc::new(env)
 }
 
-fn lookup(env: Rc<VarEnv>, x: &Ident) -> Value {
-    match env.get(x) {
+fn lookup(env: Rc<VarEnv>, x: Ident) -> Value {
+    match env.get(&x) {
         // Force a delayed value (used in `fix`)
         Some(Value {
             kind:
@@ -375,22 +375,22 @@ fn lookup(env: Rc<VarEnv>, x: &Ident) -> Value {
                     args,
                     body,
                 }),
-        }) if args.is_empty() => eval(env.clone(), body),
+        }) if args.is_empty() => eval(env.clone(), body.clone()),
         Some(x) => x.clone(),
         None => panic!("unbound variable: {}", x.name),
     }
 }
 
 /// Evaluate an expression
-pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
+pub fn eval(env: Rc<VarEnv>, expr: Expr) -> Value {
     use ExprKind::*;
-    match &expr.kind {
+    match expr.kind {
         Variable(x) => lookup(env, x),
         Label(x) => Value::accessor(x.clone()),
-        Number(n) => Value::number(*n),
+        Number(n) => Value::number(n),
         Apply(f, x) => {
-            let f = eval(env.clone(), f);
-            let x = eval(env.clone(), x);
+            let f = eval(env.clone(), *f);
+            let x = eval(env.clone(), *x);
             apply(f, x)
         }
         Codata(clauses) if clauses.len() == 1 => eval_clause(env, clauses.first().unwrap()),
@@ -420,16 +420,16 @@ pub fn eval(env: Rc<VarEnv>, expr: &Expr) -> Value {
             object.unwrap()
         }
         Let(name, value, body) => {
-            let value = eval(env.clone(), value);
+            let value = eval(env.clone(), *value);
             let mut env = (*env).clone();
             env.insert(name.clone(), value);
-            eval(Rc::new(env), body)
+            eval(Rc::new(env), *body)
         }
         Fix(name, value) => {
             let delayed = Value::function(Rc::new(HashMap::new()), vec![], *value.clone());
             let mut env = (*env).clone();
             env.insert(name.clone(), delayed);
-            eval(Rc::new(env), value)
+            eval(Rc::new(env), *value)
         }
 
         _ => panic!("cannot evaluate: {}", expr),
@@ -494,7 +494,7 @@ fn apply(f: Value, x: Value) -> Value {
             if args.len() == 1 {
                 let mut env = (*captures).clone();
                 env.insert(args[0].clone(), x);
-                eval(Rc::new(env), &body)
+                eval(Rc::new(env), body)
             } else {
                 let mut env = (*captures).clone();
                 env.insert(args[0].clone(), x);
@@ -508,7 +508,7 @@ fn apply(f: Value, x: Value) -> Value {
                 kind: ValueKind::Object(Object { captures, map }),
             } => {
                 if let Some(body) = map.get(&label) {
-                    eval(captures, body)
+                    eval(captures, body.to_owned())
                 } else {
                     panic!("no such label: {}", label.name)
                 }

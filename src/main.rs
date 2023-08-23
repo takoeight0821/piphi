@@ -38,7 +38,7 @@ fn main() -> Result<()> {
     println!("{}", ast);
 
     let ast = flatten(ast);
-    let value = eval(eval::new_env(), &ast);
+    let value = eval(eval::new_env(), ast);
 
     println!("{:?}", value);
 

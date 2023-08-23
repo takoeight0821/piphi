@@ -118,6 +118,6 @@ fn eval_test(src: &str, expected: super::Value) {
     let ast = parse(remove_whitespace(&tokens)).unwrap();
     let ast = flatten(ast);
     debug!("{}", ast);
-    let value = eval(new_env(), &ast);
+    let value = eval(new_env(), ast);
     assert_eq!(value, expected);
 }
