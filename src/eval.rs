@@ -200,7 +200,7 @@ fn split_patterns(ps: Vec<Pat>) -> Vec<Pat> {
     patterns
 }
 
-fn pop_last(branches: &[Branch], context: &Expr) -> (Vec<Branch>, Expr) {
+fn pop_last(branches: Vec<Branch>, context: Expr) -> (Vec<Branch>, Expr) {
     let mut new_branches = vec![];
     let mut new_context = Expr::hole(vec![], context.range);
     for branch in branches {
@@ -255,7 +255,7 @@ fn merge_context(left: Expr, right: Expr) -> Expr {
     } else {
         match (left.kind, &right.kind) {
             (ExprKind::Codata(mut left_clauses), ExprKind::Codata(right_clauses)) => {
-                if right_clauses.iter().any(|c| c.always_match()) {
+                if left_clauses == *right_clauses {
                     return right;
                 }
                 left_clauses.extend(right_clauses.iter().cloned());
@@ -266,46 +266,50 @@ fn merge_context(left: Expr, right: Expr) -> Expr {
     }
 }
 
-fn apply_context(context: &Expr, arg: &Expr) -> Expr {
-    match &context.kind {
+fn apply_context(context: Expr, arg: &Expr) -> Expr {
+    // `context` can be destructed and not be used anymore.
+    // So we take the ownership of `context`.
+    // But we need to pass `arg` everywhere and it's value is only used for `Hole`.
+    // So we pass `arg` by reference and clone it when it's used.
+    match context.kind {
         ExprKind::Hole(ps) if ps.is_empty() => arg.clone(),
         ExprKind::Hole(_) => todo!("guard"),
         ExprKind::Apply(e1, e2) => Expr::apply(
-            apply_context(e1, arg),
-            apply_context(e2, arg),
+            apply_context(*e1, arg),
+            apply_context(*e2, arg),
             context.range,
         ),
         ExprKind::Codata(clauses) => {
             let clauses = clauses
-                .iter()
-                .map(|c| Clause::new(c.pattern.to_owned(), apply_context(&c.body, arg)))
+                .into_iter()
+                .map(|c| Clause::new(c.pattern, apply_context(c.body, arg)))
                 .collect();
             Expr::codata(clauses, context.range)
         }
         ExprKind::Function(params, body) => {
-            Expr::function(params.clone(), apply_context(body, arg), context.range)
+            Expr::function(params, apply_context(*body, arg), context.range)
         }
         ExprKind::Object(map) => {
             let map = map
-                .iter()
+                .into_iter()
                 .map(|(k, v)| (k.clone(), apply_context(v, arg)))
                 .collect();
             Expr::object(map, context.range)
         }
         ExprKind::Case(ss, branches) => {
             let branches = branches
-                .iter()
+                .into_iter()
                 .map(|(ps, body)| (ps.clone(), apply_context(body, arg)))
                 .collect();
-            Expr::case(ss.clone(), branches, context.range)
+            Expr::case(ss, branches, context.range)
         }
         ExprKind::Let(var, value, body) => Expr::let_(
             &var.name,
-            apply_context(value, arg),
-            apply_context(body, arg),
+            apply_context(*value, arg),
+            apply_context(*body, arg),
             context.range,
         ),
-        _ => context.clone(),
+        _ => context,
     }
 }
 
@@ -331,7 +335,7 @@ pub fn flatten(expr: Expr) -> Expr {
                         .join(", ")
                 );
                 debug!("contexts: {}", contexts);
-                (branches, contexts) = pop_last(&branches, &contexts);
+                (branches, contexts) = pop_last(branches, contexts);
                 if branches.is_empty() {
                     return contexts;
                 }
@@ -362,6 +366,7 @@ type VarEnv = HashMap<Ident, Value>;
 pub fn new_env() -> Rc<VarEnv> {
     let mut env = HashMap::new();
     env.insert(Ident::new("add"), Value::primitive("add"));
+    env.insert(Ident::new("sub"), Value::primitive("sub"));
     Rc::new(env)
 }
 
@@ -538,6 +543,18 @@ fn apply_primitive(name: &str, args: Vec<Value>, x: Value) -> Value {
                 match (&args[0].kind, &x.kind) {
                     (ValueKind::Number(a), ValueKind::Number(b)) => Value::number(a + b),
                     _ => panic!("cannot add: {} {}", args[0], x),
+                }
+            } else {
+                panic!("too many arguments: {}", args.len())
+            }
+        }
+        "sub" => {
+            if args.is_empty() {
+                Value::partial_primitive(name, &args, vec![x])
+            } else if args.len() == 1 {
+                match (&args[0].kind, &x.kind) {
+                    (ValueKind::Number(a), ValueKind::Number(b)) => Value::number(a - b),
+                    _ => panic!("cannot sub: {} {}", args[0], x),
                 }
             } else {
                 panic!("too many arguments: {}", args.len())

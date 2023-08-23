@@ -102,6 +102,19 @@ fn test_fibo() {
 }
 
 #[test]
+fn test_countdown() {
+    eval_test(
+        r#"
+        let countdown = fix f in {
+            # 0 -> 1,
+            # n -> f (sub n 1)
+        } in countdown 5
+        "#,
+        super::Value::number(1),
+    )
+}
+
+#[test]
 fn test_magic_swap() {
     eval_test(
         r#"

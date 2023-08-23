@@ -225,10 +225,6 @@ impl Clause {
     pub fn new(pattern: Pat, body: Expr) -> Clause {
         Clause { pattern, body }
     }
-
-    pub fn always_match(&self) -> bool {
-        self.pattern.always_match()
-    }
 }
 
 impl Display for Clause {
@@ -280,18 +276,6 @@ impl Pat {
         Pat {
             kind: PatKind::Number(n),
             range,
-        }
-    }
-
-    fn always_match(&self) -> bool {
-        match &self.kind {
-            PatKind::Sequence(ps) => match &ps[..] {
-                [this, args @ ..] => {
-                    this.kind == PatKind::This && args.iter().all(|p| p.kind.is_variable())
-                }
-                _ => false,
-            },
-            _ => false,
         }
     }
 }

@@ -1,9 +1,16 @@
 use std::ops::Add;
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Range {
     pub start: Position,
     pub end: Position,
+}
+
+impl PartialEq for Range {
+    // all ranges are equal
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
 }
 
 impl Add for Range {
