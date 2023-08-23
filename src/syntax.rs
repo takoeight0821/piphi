@@ -286,17 +286,6 @@ impl Pat {
         }
     }
 
-    pub fn empty() -> Pat {
-        Pat {
-            kind: PatKind::Empty,
-            range: Default::default(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        matches!(self.kind, PatKind::Empty)
-    }
-
     fn always_match(&self) -> bool {
         match &self.kind {
             PatKind::Sequence(ps) => match &ps[..] {
@@ -323,7 +312,6 @@ pub enum PatKind {
     Variable(Ident),
     Label(Ident),
     Number(i64),
-    Empty,
 }
 
 impl Display for PatKind {
@@ -342,7 +330,6 @@ impl Display for PatKind {
             PatKind::Variable(ident) => write!(f, "{}", ident.name),
             PatKind::Label(ident) => write!(f, ".{}", ident.name),
             PatKind::Number(n) => write!(f, "{}", n),
-            PatKind::Empty => write!(f, "_"),
         }
     }
 }
@@ -350,9 +337,5 @@ impl Display for PatKind {
 impl PatKind {
     pub fn is_variable(&self) -> bool {
         matches!(self, PatKind::Variable(_))
-    }
-
-    pub fn is_label(&self) -> bool {
-        matches!(self, PatKind::Label(_))
     }
 }

@@ -6,7 +6,6 @@ use crate::{
     },
 };
 use log::debug;
-use std::{collections::HashMap, rc::Rc};
 
 fn init() {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -97,8 +96,8 @@ fn test_fibo() {
               .head (.tail #) -> 1,
               .tail (.tail #) -> zipWith add fibo (.tail fibo)
             } in
-            .head (.tail (.tail fibo))"#,
-        super::Value::number(2),
+            .head (.tail (.tail (.tail (.tail fibo))))"#,
+        super::Value::number(5),
     );
 }
 
