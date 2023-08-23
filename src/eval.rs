@@ -393,30 +393,31 @@ pub fn eval(env: Rc<VarEnv>, expr: Expr) -> Value {
             let x = eval(env.clone(), *x);
             apply(f, x)
         }
-        Codata(clauses) if clauses.len() == 1 => eval_clause(env, clauses.first().unwrap()),
+        Codata(mut clauses) if clauses.len() == 1 => eval_clause(env, clauses.remove(0)),
         Codata(clauses) => {
-            let object: Option<Value> =
+            let error = format!(
+                "codata must be flattened: {}",
                 clauses
                     .iter()
-                    .map(|c| eval_clause(env.clone(), c))
-                    .reduce(|a, b| {
-                        let mut map = HashMap::new();
-                        match (a.kind, b.kind) {
-                            (ValueKind::Object(a), ValueKind::Object(b)) => {
-                                map.extend(a.map);
-                                map.extend(b.map);
-                            }
-                            _ => panic!(
-                                "codata must be flattened: {}",
-                                clauses
-                                    .iter()
-                                    .map(|c| format!("{}", c))
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            ),
+                    .map(|c| format!("{}", c))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+
+            let object: Option<Value> = clauses
+                .into_iter()
+                .map(|c| eval_clause(env.clone(), c))
+                .reduce(|a, b| {
+                    let mut map = HashMap::new();
+                    match (a.kind, b.kind) {
+                        (ValueKind::Object(a), ValueKind::Object(b)) => {
+                            map.extend(a.map);
+                            map.extend(b.map);
                         }
-                        Value::object(env.clone(), map)
-                    });
+                        _ => panic!("{}", error),
+                    }
+                    Value::object(env.clone(), map)
+                });
             object.unwrap()
         }
         Let(name, value, body) => {
@@ -438,7 +439,7 @@ pub fn eval(env: Rc<VarEnv>, expr: Expr) -> Value {
 
 /// Turn a clause into a function.
 /// Restriction: the clause must have a sequence of patterns that start with a `#` and other patterns must be variables.
-fn eval_clause(env: Rc<VarEnv>, clause: &Clause) -> Value {
+fn eval_clause(env: Rc<VarEnv>, clause: Clause) -> Value {
     match clause {
         Clause {
             pattern:
@@ -474,7 +475,13 @@ fn eval_clause(env: Rc<VarEnv>, clause: &Clause) -> Value {
                     map.insert(label.clone(), body.clone());
                     Value::object(env.clone(), map)
                 }
-                _ => panic!("nested pattern: {}", clause.pattern),
+                _ => panic!(
+                    "nested pattern: {}",
+                    ps.iter()
+                        .map(|p| format!("{}", p))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                ),
             }
         }
         _ => panic!("invalid pattern: {}", clause.pattern),
