@@ -85,7 +85,7 @@ fn parse_test() {
     let fun = Expr::codata(
         vec![
             Clause::new(
-                &Pat::sequence(
+                Pat::sequence(
                     &[
                         Pat::label("get", Default::default()),
                         Pat::sequence(
@@ -98,10 +98,10 @@ fn parse_test() {
                     ],
                     Default::default(),
                 ),
-                &Expr::variable("x", Default::default()),
+                Expr::variable("x", Default::default()),
             ),
             Clause::new(
-                &Pat::sequence(
+                Pat::sequence(
                     &vec![
                         Pat::label("set", Default::default()),
                         Pat::sequence(
@@ -115,7 +115,7 @@ fn parse_test() {
                     ],
                     Default::default(),
                 ),
-                &Expr::apply(
+                Expr::apply(
                     Expr::variable("fun", Default::default()),
                     Expr::variable("y", Default::default()),
                     Default::default(),

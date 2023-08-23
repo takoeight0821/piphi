@@ -218,15 +218,18 @@ fn pop_last(branches: &[Branch], context: &Expr) -> (Vec<Branch>, Expr) {
         if rest_patterns.is_empty() {
             new_context = merge_context(
                 new_context,
-                Expr::codata(vec![Clause::new(last_pattern, &branch.body)], context.range),
+                Expr::codata(
+                    vec![Clause::new(last_pattern.to_owned(), branch.body.to_owned())],
+                    context.range,
+                ),
             );
         } else {
             new_context = merge_context(
                 new_context,
                 Expr::codata(
                     vec![Clause::new(
-                        last_pattern,
-                        &Expr::hole(vec![], last_pattern.range),
+                        last_pattern.to_owned(),
+                        Expr::hole(vec![], last_pattern.range),
                     )],
                     context.range,
                 ),
@@ -275,7 +278,7 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
         ExprKind::Codata(clauses) => {
             let clauses = clauses
                 .iter()
-                .map(|c| Clause::new(&c.pattern, &apply_context(&c.body, arg)))
+                .map(|c| Clause::new(c.pattern.to_owned(), apply_context(&c.body, arg)))
                 .collect();
             Expr::codata(clauses, context.range)
         }

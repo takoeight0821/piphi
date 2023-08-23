@@ -178,8 +178,8 @@ impl Parser {
         }
         let mut clauses = vec![];
         loop {
-            if let Ok((pat, expr)) = self.clause() {
-                clauses.push(Clause::new(&pat, &expr));
+            if let Ok((pattern, body)) = self.clause() {
+                clauses.push(Clause::new(pattern, body));
             } else {
                 break;
             }

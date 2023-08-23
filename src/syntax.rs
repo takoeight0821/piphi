@@ -222,11 +222,8 @@ pub struct Clause {
 }
 
 impl Clause {
-    pub fn new(pattern: &Pat, body: &Expr) -> Clause {
-        Clause {
-            pattern: pattern.clone(),
-            body: body.clone(),
-        }
+    pub fn new(pattern: Pat, body: Expr) -> Clause {
+        Clause { pattern, body }
     }
 
     pub fn always_match(&self) -> bool {
