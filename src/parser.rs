@@ -79,7 +79,7 @@ impl Parser {
             return Err(self.expected_error("'in'"));
         }
         let body = self.expr().unwrap();
-        Ok(Expr::fix(&name, &body, range))
+        Ok(Expr::fix(&name, body, range))
     }
 
     /// let ::= 'fix' identifier 'in' expr | 'let' identifier '=' expr 'in' expr | apply
@@ -92,7 +92,7 @@ impl Parser {
                 return Err(self.expected_error("'in'"));
             }
             let body = self.expr().unwrap();
-            return Ok(Expr::fix(&name, &body, range));
+            return Ok(Expr::fix(&name, body, range));
         }
 
         if !self.match_token(&TokenKind::Ident("let".to_string())) {

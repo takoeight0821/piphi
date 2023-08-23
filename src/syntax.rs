@@ -72,9 +72,9 @@ impl Expr {
         }
     }
 
-    pub fn function(params: Vec<Ident>, arg: &Expr, range: Range) -> Expr {
+    pub fn function(params: Vec<Ident>, arg: Expr, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Function(params, Box::new(arg.clone())),
+            kind: ExprKind::Function(params, Box::new(arg)),
             range,
         }
     }
@@ -93,13 +93,13 @@ impl Expr {
         }
     }
 
-    pub fn fix(name: &str, body: &Expr, range: Range) -> Expr {
+    pub fn fix(name: &str, body: Expr, range: Range) -> Expr {
         Expr {
             kind: ExprKind::Fix(
                 Ident {
                     name: name.to_owned(),
                 },
-                Box::new(body.clone()),
+                Box::new(body),
             ),
             range,
         }

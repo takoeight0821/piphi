@@ -280,7 +280,7 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
             Expr::codata(clauses, context.range)
         }
         ExprKind::Function(params, body) => {
-            Expr::function(params.clone(), &apply_context(body, arg), context.range)
+            Expr::function(params.clone(), apply_context(body, arg), context.range)
         }
         ExprKind::Object(map) => {
             let map = map
@@ -346,7 +346,7 @@ pub fn flatten(expr: Expr) -> Expr {
         }
         Fix(name, value) => {
             let value = flatten(*value);
-            Expr::fix(&name.name, &value, expr.range)
+            Expr::fix(&name.name, value, expr.range)
         }
         // Function, Object, Case includes Expr, but they are already flattened.
         _ => expr.clone(),
