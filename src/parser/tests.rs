@@ -141,8 +141,8 @@ fn parse_test() {
 fn parse_let() {
     let expr = Expr::let_(
         "x",
-        &Expr::number(1, Default::default()),
-        &Expr::variable("x", Default::default()),
+        Expr::number(1, Default::default()),
+        Expr::variable("x", Default::default()),
         Default::default(),
     );
 

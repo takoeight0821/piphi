@@ -107,7 +107,7 @@ impl Parser {
             return Err(self.expected_error("'in'"));
         }
         let body = self.expr()?;
-        Ok(Expr::let_(&name, &value, &body, range))
+        Ok(Expr::let_(&name, value, body, range))
     }
 
     /// apply ::= term (term)*

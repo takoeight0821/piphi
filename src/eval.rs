@@ -298,8 +298,8 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
         }
         ExprKind::Let(var, value, body) => Expr::let_(
             &var.name,
-            &apply_context(value, arg),
-            &apply_context(body, arg),
+            apply_context(value, arg),
+            apply_context(body, arg),
             context.range,
         ),
         _ => context.clone(),
@@ -342,7 +342,7 @@ pub fn flatten(expr: Expr) -> Expr {
         Let(name, value, body) => {
             let value = flatten(*value);
             let body = flatten(*body);
-            Expr::let_(&name.name, &value, &body, expr.range)
+            Expr::let_(&name.name, value, body, expr.range)
         }
         Fix(name, value) => {
             let value = flatten(*value);
