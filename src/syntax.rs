@@ -38,9 +38,9 @@ impl Expr {
         }
     }
 
-    pub fn apply(left: &Expr, right: &Expr, range: Range) -> Expr {
+    pub fn apply(left: Expr, right: Expr, range: Range) -> Expr {
         Expr {
-            kind: ExprKind::Apply(Box::new(left.clone()), Box::new(right.clone())),
+            kind: ExprKind::Apply(Box::new(left), Box::new(right)),
             range,
         }
     }

@@ -268,8 +268,8 @@ fn apply_context(context: &Expr, arg: &Expr) -> Expr {
         ExprKind::Hole(ps) if ps.is_empty() => arg.clone(),
         ExprKind::Hole(_) => todo!("guard"),
         ExprKind::Apply(e1, e2) => Expr::apply(
-            &apply_context(e1, arg),
-            &apply_context(e2, arg),
+            apply_context(e1, arg),
+            apply_context(e2, arg),
             context.range,
         ),
         ExprKind::Codata(clauses) => {
@@ -337,7 +337,7 @@ pub fn flatten(expr: Expr) -> Expr {
         Apply(e1, e2) => {
             let e1 = flatten(*e1);
             let e2 = flatten(*e2);
-            Expr::apply(&e1, &e2, expr.range)
+            Expr::apply(e1, e2, expr.range)
         }
         Let(name, value, body) => {
             let value = flatten(*value);

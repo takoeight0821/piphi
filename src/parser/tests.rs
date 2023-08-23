@@ -86,10 +86,10 @@ fn parse_test() {
         vec![
             Clause::new(
                 &Pat::sequence(
-                    &vec![
+                    &[
                         Pat::label("get", Default::default()),
                         Pat::sequence(
-                            &vec![
+                            &[
                                 Pat::this(Default::default()),
                                 Pat::variable("x", Default::default()),
                             ],
@@ -105,7 +105,7 @@ fn parse_test() {
                     &vec![
                         Pat::label("set", Default::default()),
                         Pat::sequence(
-                            &vec![
+                            &[
                                 Pat::this(Default::default()),
                                 Pat::variable("p", Default::default()),
                             ],
@@ -116,21 +116,17 @@ fn parse_test() {
                     Default::default(),
                 ),
                 &Expr::apply(
-                    &Expr::variable("fun", Default::default()),
-                    &Expr::variable("y", Default::default()),
+                    Expr::variable("fun", Default::default()),
+                    Expr::variable("y", Default::default()),
                     Default::default(),
                 ),
             ),
         ],
         Default::default(),
     );
-    let right = Expr::apply(
-        &fun,
-        &Expr::number(1, Default::default()),
-        Default::default(),
-    );
+    let right = Expr::apply(fun, Expr::number(1, Default::default()), Default::default());
     let left = Expr::label("get", Default::default());
-    let expr = Expr::apply(&left, &right, Default::default());
+    let expr = Expr::apply(left, right, Default::default());
 
     let src = format!("{}", expr);
 

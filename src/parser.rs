@@ -116,7 +116,8 @@ impl Parser {
             let mut iter = terms.into_iter();
             let mut expr: Expr = iter.next().unwrap();
             for term in iter {
-                expr = Expr::apply(&expr, &term, expr.range + term.range);
+                let range = expr.range + term.range;
+                expr = Expr::apply(expr, term, range);
             }
             expr
         }
