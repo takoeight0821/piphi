@@ -1,5 +1,5 @@
 use crate::{
-    eval::{eval, flatten, new_env},
+    eval::{eval, new_env, normalize_copattern},
     parser::{
         lexer::{remove_whitespace, tokenize},
         parse,
@@ -129,7 +129,7 @@ fn eval_test(src: &str, expected: super::Value) {
     init();
     let tokens = tokenize(src).unwrap();
     let ast = parse(remove_whitespace(&tokens)).unwrap();
-    let ast = flatten(ast);
+    let ast = normalize_copattern(ast);
     debug!("{}", ast);
     let value = eval(new_env(), ast);
     assert_eq!(value, expected);

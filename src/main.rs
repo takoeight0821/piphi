@@ -4,7 +4,7 @@ mod syntax;
 
 use anyhow::Result;
 use clap::Parser;
-use eval::{eval, flatten};
+use eval::{eval, normalize_copattern};
 use parser::{
     lexer::{remove_whitespace, tokenize},
     parse,
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
 
     println!("{}", ast);
 
-    let ast = flatten(ast);
+    let ast = normalize_copattern(ast);
     let value = eval(eval::new_env(), ast);
 
     println!("{:?}", value);

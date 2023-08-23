@@ -86,9 +86,20 @@ impl Expr {
         }
     }
 
-    pub fn case(ss: Vec<Ident>, branches: Vec<(Vec<Pat>, Expr)>, range: Range) -> Expr {
+    pub fn case(
+        scrutinees: Vec<Ident>,
+        patterns: Vec<Pat>,
+        then_expr: Expr,
+        else_expr: Expr,
+        range: Range,
+    ) -> Expr {
         Expr {
-            kind: ExprKind::Case(ss, branches),
+            kind: ExprKind::Case(
+                scrutinees,
+                patterns,
+                Box::new(then_expr),
+                Box::new(else_expr),
+            ),
             range,
         }
     }
@@ -119,7 +130,7 @@ pub enum ExprKind {
     // Used for desugaring
     Object(HashMap<Ident, Expr>),
     // Used for desugaring
-    Case(Vec<Ident>, Vec<(Vec<Pat>, Expr)>),
+    Case(Vec<Ident>, Vec<Pat>, Box<Expr>, Box<Expr>),
     // Used for desugaring
     Hole(Vec<Ident>),
     // Used for desugaring
@@ -163,27 +174,17 @@ impl Display for ExprKind {
                 }
                 write!(f, " }}")
             }
-            ExprKind::Case(ss, clauses) => {
-                write!(f, "case ")?;
-                write!(f, "{}", ss[0].name)?;
-                for s in ss[1..].iter() {
-                    write!(f, " {}", s.name)?;
+            ExprKind::Case(scrutinees, patterns, then_expr, else_expr) => {
+                // case (x y z) (a b c) then | else
+                write!(f, "case (")?;
+                for scrutinee in scrutinees.iter() {
+                    write!(f, "{} ", scrutinee.name)?;
                 }
-                write!(f, " {{ ")?;
-                let (first_patterns, first_body) = clauses.iter().next().unwrap();
-                for pattern in first_patterns.iter() {
+                write!(f, ") (")?;
+                for pattern in patterns.iter() {
                     write!(f, "{} ", pattern)?;
                 }
-                write!(f, "-> {}", first_body)?;
-
-                for (patterns, body) in clauses.iter().skip(1) {
-                    write!(f, ", ")?;
-                    for pattern in patterns.iter() {
-                        write!(f, "{} ", pattern)?;
-                    }
-                    write!(f, "-> {}", body)?;
-                }
-                write!(f, " }}")
+                write!(f, ") {} | {}", then_expr, else_expr)
             }
             ExprKind::Hole(args) => {
                 write!(f, "([.]")?;

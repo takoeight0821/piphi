@@ -170,7 +170,7 @@ fn build_branch(clause: Clause) -> Branch {
             let patterns = split_patterns(ps);
             Branch {
                 patterns,
-                body: flatten(body),
+                body: normalize_copattern(body),
             }
         }
         _ => panic!("invalid pattern: {}", clause.pattern),
@@ -296,13 +296,13 @@ fn apply_context(context: Expr, arg: &Expr) -> Expr {
                 .collect();
             Expr::object(map, context.range)
         }
-        ExprKind::Case(ss, branches) => {
-            let branches = branches
-                .into_iter()
-                .map(|(ps, body)| (ps.clone(), apply_context(body, arg)))
-                .collect();
-            Expr::case(ss, branches, context.range)
-        }
+        ExprKind::Case(scrutinees, patterns, then_expr, else_expr) => Expr::case(
+            scrutinees,
+            patterns,
+            apply_context(*then_expr, arg),
+            apply_context(*else_expr, arg),
+            context.range,
+        ),
         ExprKind::Let(var, value, body) => Expr::let_(
             &var.name,
             apply_context(*value, arg),
@@ -314,7 +314,7 @@ fn apply_context(context: Expr, arg: &Expr) -> Expr {
 }
 
 /// Preprocess an expression
-pub fn flatten(expr: Expr) -> Expr {
+pub fn normalize_copattern(expr: Expr) -> Expr {
     use ExprKind::*;
 
     match expr.kind {
@@ -342,17 +342,17 @@ pub fn flatten(expr: Expr) -> Expr {
             }
         }
         Apply(e1, e2) => {
-            let e1 = flatten(*e1);
-            let e2 = flatten(*e2);
+            let e1 = normalize_copattern(*e1);
+            let e2 = normalize_copattern(*e2);
             Expr::apply(e1, e2, expr.range)
         }
         Let(name, value, body) => {
-            let value = flatten(*value);
-            let body = flatten(*body);
+            let value = normalize_copattern(*value);
+            let body = normalize_copattern(*body);
             Expr::let_(&name.name, value, body, expr.range)
         }
         Fix(name, value) => {
-            let value = flatten(*value);
+            let value = normalize_copattern(*value);
             Expr::fix(&name.name, value, expr.range)
         }
         // Function, Object, Case includes Expr, but they are already flattened.
